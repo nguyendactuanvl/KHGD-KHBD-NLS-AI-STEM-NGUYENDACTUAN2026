@@ -1,0 +1,6 @@
+{
+  "name": "EduPlan AI",
+  "description": "Ứng dụng soạn kế hoạch giáo dục, kế hoạch dạy học tích hợp Năng lực số, Năng lực AI và giáo dục STEM/STEAM.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
