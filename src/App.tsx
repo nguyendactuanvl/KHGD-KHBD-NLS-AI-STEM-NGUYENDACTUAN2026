@@ -12,6 +12,7 @@ import { HistoryPage } from "./pages/HistoryPage";
 import { Worksheets } from "./pages/Worksheets";
 import { SettingsModal } from "./components/SettingsModal";
 import { ExerciseSolver } from './pages/ExerciseSolver';
+import { PdfToWord } from './pages/PdfToWord';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("khgd");
@@ -36,6 +37,7 @@ export default function App() {
         {activeTab === "khdh" && <LessonPlan />}
         {activeTab === "worksheets" && <Worksheets />}
         {activeTab === "exercise" && <ExerciseSolver />}
+        {activeTab === "pdf2word" && <PdfToWord />}
         {activeTab === "circulars" && <Circulars />}
         {activeTab === "history" && <HistoryPage />}
       </main>

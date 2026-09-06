@@ -177,7 +177,7 @@ const handleSolve = async () => {
     printElement(exportRef.current, "LoiGiai_ChiTiet");
   };
 
-  const handleExportWord = () => {
+  const handleExportWord = (keepLatex: boolean = false) => {
     if (!solution || !exportRef.current) return;
     const clone = exportRef.current.cloneNode(true) as HTMLElement;
     
@@ -186,6 +186,7 @@ const handleSolve = async () => {
       const mathNode = el.querySelector('.katex-mathml math');
       if (mathNode) {
         const mathClone = mathNode.cloneNode(true) as Element;
+        mathClone.setAttribute('xmlns', 'http://www.w3.org/1998/Math/MathML');
         const annotations = mathClone.querySelectorAll('annotation');
         annotations.forEach(a => a.remove());
         const semantics = mathClone.querySelector('semantics');
@@ -271,50 +272,40 @@ const handleSolve = async () => {
                   </div>
                   <h3 className="text-lg font-semibold text-slate-700 mb-2">Tải lên đề bài của bạn</h3>
                   <p className="text-slate-500 mb-6 text-sm">Hỗ trợ file ảnh, PDF, Word (.docx), hoặc file text</p>
-                  <button className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                  <button className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
                     Chọn File
                   </button>
                 </>
               ) : (
                 <div className="text-center w-full">
                   <div className="bg-emerald-100 p-4 rounded-full mb-4 mx-auto w-16 h-16 flex items-center justify-center">
-                    <Upload className="w-8 h-8 text-emerald-600" />
+                    <FileText className="w-8 h-8 text-emerald-600" />
                   </div>
                   <h3 className="text-lg font-semibold text-emerald-700 mb-2 truncate px-4">{selectedFile.name}</h3>
-                  <p className="text-slate-500 mb-6">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                  <p className="text-slate-500 mb-6 text-sm">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                   
                   <div className="flex justify-center gap-3">
                     <button 
-                      className="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 flex items-center gap-2"
+                      className="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 flex items-center gap-2 transition-colors"
                       onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
                     >
                       <X className="w-4 h-4" /> Hủy
                     </button>
-                    
                     <button 
-                      className="px-6 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 flex items-center gap-2"
-                      onClick={(e) => { e.stopPropagation(); handleSolve(); }}
-                      disabled={isUploading || isGeneratingSimilar}
+                      className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-sm"
+                      onClick={(e) => { e.stopPropagation(); handleSolveFromImage(); }}
+                      disabled={isUploading}
                     >
                       {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                      Bắt đầu giải
+                      Giải Bài Tập
                     </button>
-                    <button 
-                      className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 flex items-center gap-2"
-                      onClick={(e) => { e.stopPropagation(); handleGenerateSimilar(); }}
-                      disabled={isUploading || isGeneratingSimilar}
-                    >
-                      {isGeneratingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
-                      Tạo bài tương tự
-                    </button>
-
                   </div>
                 </div>
               )}
             </div>
             
             {error && (
-              <div className="mt-4 p-4 bg-rose-50 text-rose-700 rounded-lg text-center">
+              <div className="mt-4 p-4 bg-rose-50 text-rose-700 rounded-lg text-sm text-center border border-rose-200">
                 {error}
               </div>
             )}
@@ -322,29 +313,44 @@ const handleSolve = async () => {
         )}
 
         {solution && (
-          <div className="mt-8 border-t pt-8">
-            <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
-              <h3 className="text-xl font-bold text-slate-800">Kết quả giải bài tập</h3>
-              <div className="flex items-center gap-2 flex-wrap">
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-blue-600" />
+                Lời giải chi tiết
+              </h3>
+              <div className="flex flex-wrap items-center gap-2">
                 <button 
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors flex items-center gap-2"
+                  onClick={handleSaveToLibrary}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"
                 >
-                  <Save className="w-4 h-4" /> Lưu thư viện
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookmarkPlus className="w-4 h-4" />}
+                  Lưu thư viện
                 </button>
                 <button 
-                  onClick={() => setSolution('')}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors mr-4"
+                  onClick={handleGenerateSimilar}
+                  disabled={isGeneratingSimilar}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm text-sm font-medium"
                 >
-                  Giải bài khác
+                  {isGeneratingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                  Tạo bài tương tự
                 </button>
-
-                <button 
-                  onClick={handleExportWord}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                >
-                  <Download className="w-4 h-4" /> Word
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleExportWord(false)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm"
+                  >
+                    <Download className="w-4 h-4" /> Word
+                  </button>
+                  <button 
+                    onClick={() => handleExportWord(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm text-sm"
+                    title="Giữ nguyên mã LaTeX để dùng MathType"
+                  >
+                    LaTeX
+                  </button>
+                </div>
                 <button 
                   onClick={() => handleExportPDF()}
                   className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors shadow-sm"

@@ -1,4 +1,4 @@
-import { BookOpen, Calendar, FileText, Settings, Sparkles, Clock, ClipboardList } from "lucide-react";
+import {  BookOpen, Calendar, FileText, Settings, Sparkles, Clock, ClipboardList , FileEdit } from "lucide-react";
 import { cn } from "../lib/utils";
 
 interface SidebarProps {
@@ -13,6 +13,7 @@ export function Sidebar({ activeTab, setActiveTab, onOpenSettings }: SidebarProp
     { id: "khdh", label: "Kế hoạch dạy học", icon: BookOpen },
     { id: "worksheets", label: "Phiếu học tập", icon: ClipboardList },
     { id: "exercise", label: "Giải bài tập", icon: Sparkles },
+    { id: "pdf2word", label: "Chuyển PDF sang Word", icon: FileEdit },
     { id: "circulars", label: "Kiểm tra thông tư", icon: FileText },
     { id: "history", label: "Lịch sử đã tạo", icon: Clock },
   ];

@@ -1,0 +1,274 @@
+import React, { useState, useRef } from 'react';
+import { Upload, X, FileText, Loader2, Download, AlertCircle } from 'lucide-react';
+import Markdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import mammoth from 'mammoth';
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = error => reject(error);
+  });
+};
+
+export function PdfToWord() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [resultText, setResultText] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  
+  const exportRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setError(null);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setError(null);
+    }
+  };
+
+  const processDocx = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const arrayBuffer = event.target?.result as ArrayBuffer;
+        mammoth.convertToHtml({arrayBuffer: arrayBuffer})
+          .then(function(result){ resolve(result.value); })
+          .catch(function(err) { reject(err); });
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const handleConvert = async () => {
+    if (!selectedFile) {
+      setError('Vui lòng chọn file trước.');
+      return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+    setResultText('');
+
+    try {
+      let fileData = '';
+      let mimeType = selectedFile.type;
+
+      if (selectedFile.name.endsWith('.docx')) {
+        const text = await processDocx(selectedFile);
+        fileData = btoa(unescape(encodeURIComponent(text)));
+        mimeType = 'text/plain';
+      } else {
+        fileData = await fileToBase64(selectedFile);
+      }
+
+      const response = await fetch('/api/pdf-to-word', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files: [{ data: fileData, type: mimeType }]
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Có lỗi xảy ra khi xử lý file');
+      }
+
+      const data = await response.json();
+      setResultText(typeof data.result === 'string' ? data.result : (data.result?.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data.result)));
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Lỗi kết nối. Vui lòng thử lại sau.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleExportWord = (keepLatex: boolean = false) => {
+    if (!resultText || !exportRef.current) return;
+    const clone = exportRef.current.cloneNode(true) as HTMLElement;
+    
+    const katexElements = clone.querySelectorAll('.katex');
+    katexElements.forEach(el => {
+      const annotation = el.querySelector('annotation[encoding="application/x-tex"]');
+      if (keepLatex && annotation && annotation.textContent) {
+        const isBlock = el.classList.contains('katex-display');
+        const rawTex = annotation.textContent;
+        const textNode = document.createTextNode(isBlock ? `$$\n${rawTex}\n$$` : `$${rawTex}$`);
+        el.parentNode?.replaceChild(textNode, el);
+      } else {
+        const mathNode = el.querySelector('.katex-mathml math');
+        if (mathNode) {
+          const mathClone = mathNode.cloneNode(true) as Element;
+          mathClone.setAttribute('xmlns', 'http://www.w3.org/1998/Math/MathML');
+          const annotations = mathClone.querySelectorAll('annotation');
+          annotations.forEach(a => a.remove());
+          const semantics = mathClone.querySelector('semantics');
+          if (semantics) {
+             while (semantics.firstChild) {
+                 mathClone.insertBefore(semantics.firstChild, semantics);
+             }
+             semantics.remove();
+          }
+          el.parentNode?.replaceChild(mathClone, el);
+        }
+      }
+    });
+
+    const contentHtml = clone.innerHTML;
+    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document</title><style>body { font-family: 'Times New Roman', Times, serif; font-size: 14pt; } table { border-collapse: collapse; width: 100%; margin: 15pt 0; } th, td { border: 1px solid black; padding: 6pt; } img { max-width: 100%; height: auto; display: block; margin: 15pt auto; text-align: center; } h1, h2, h3 { color: #1e293b; margin-top: 15pt; margin-bottom: 5pt; }</style></head><body>";
+    const footer = "</body></html>";
+    const sourceHTML = header + contentHtml + footer;
+    
+    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+    const fileDownload = document.createElement("a");
+    document.body.appendChild(fileDownload);
+    fileDownload.href = source;
+    fileDownload.download = `TaiLieu_DaChuyenDoi_${new Date().getTime()}.doc`;
+    fileDownload.click();
+    document.body.removeChild(fileDownload);
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2 mb-2">
+            <FileText className="w-8 h-8 text-blue-600" />
+            Chuyển đổi tài liệu (PDF/Ảnh) sang Word
+          </h2>
+          <p className="text-slate-600">Công cụ số hóa tài liệu sử dụng AI, nhận dạng chính xác công thức Toán học chuẩn LaTeX.</p>
+        </div>
+
+        <div className="max-w-2xl mx-auto">
+          {!selectedFile ? (
+            <div 
+              className="border-2 border-dashed border-slate-300 rounded-xl p-12 text-center hover:bg-slate-50 transition-colors cursor-pointer"
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg,.docx"
+              />
+              <div className="bg-blue-100 p-4 rounded-full w-16 h-16 mx-auto flex items-center justify-center mb-4">
+                <Upload className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Kéo thả file hoặc nhấn để tải lên</h3>
+              <p className="text-slate-500 mb-6 text-sm">Hỗ trợ file PDF, Ảnh (.png, .jpg), hoặc Word (.docx)</p>
+              <button className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                Chọn File
+              </button>
+            </div>
+          ) : (
+            <div className="text-center w-full border-2 border-slate-200 rounded-xl p-12">
+              <div className="bg-emerald-100 p-4 rounded-full mb-4 mx-auto w-16 h-16 flex items-center justify-center">
+                <FileText className="w-8 h-8 text-emerald-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-emerald-700 mb-2 truncate px-4">{selectedFile.name}</h3>
+              <p className="text-slate-500 mb-6">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+              
+              <div className="flex justify-center gap-3">
+                <button 
+                  className="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 flex items-center gap-2"
+                  onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                >
+                  <X className="w-4 h-4" /> Hủy
+                </button>
+                <button 
+                  className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                  onClick={(e) => { e.stopPropagation(); handleConvert(); }}
+                  disabled={isUploading}
+                >
+                  {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                  Số hóa sang Word
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className="max-w-2xl mx-auto mt-6">
+          <div className="flex items-start gap-3 p-4 bg-amber-50 text-amber-800 rounded-lg text-sm border border-amber-200">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600" />
+            <div>
+              <p className="font-semibold mb-1 text-amber-900">Lưu ý về hình ảnh & hình vẽ:</p>
+              <p>AI được tối ưu đặc biệt để nhận diện và gõ lại chuẩn 100% công thức Toán/Lý/Hóa. Với <b>file PDF/Ảnh</b>, do hạn chế kỹ thuật bóc tách ảnh tự động, AI sẽ để lại ghi chú vị trí của biểu đồ/hình vẽ (VD: <i>[Hình vẽ...]</i>) để thầy/cô tự copy ảnh gốc dán vào file Word sau. Với <b>file Word (.docx)</b>, hình ảnh sẽ được tự động giữ nguyên.</p>
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="max-w-2xl mx-auto mt-4 p-4 bg-rose-50 text-rose-700 rounded-lg text-center">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {resultText && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+          <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+            <h3 className="text-xl font-bold text-slate-800">Tài liệu đã số hóa thành công!</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button 
+                onClick={() => setResultText('')}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors mr-4"
+              >
+                Chuyển file khác
+              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => handleExportWord(false)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm"
+                >
+                  <Download className="w-4 h-4" /> Word (Chuẩn)
+                </button>
+                <button 
+                  onClick={() => handleExportWord(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm"
+                  title="Dành cho giáo viên dùng MathType"
+                >
+                  <Download className="w-4 h-4" /> Word (Mã LaTeX)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 rounded-xl p-8 border border-slate-200">
+            <div ref={exportRef} className="markdown-body prose prose-slate max-w-none prose-headings:text-slate-800 prose-h2:text-2xl prose-h2:text-blue-700 prose-h2:border-b prose-h2:pb-2 prose-h3:text-xl prose-a:text-emerald-600">
+              <Markdown 
+                remarkPlugins={[remarkMath, remarkGfm]} 
+                rehypePlugins={[rehypeRaw, rehypeKatex]}
+              >
+                {resultText}
+              </Markdown>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
