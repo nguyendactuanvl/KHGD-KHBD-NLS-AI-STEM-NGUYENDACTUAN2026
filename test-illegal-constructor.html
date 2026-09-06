@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html><body>
+<script>
+  try { new HTMLElement(); } catch(e) { console.log("HTMLElement", e.message); }
+  try { new Element(); } catch(e) { console.log("Element", e.message); }
+  try { new Node(); } catch(e) { console.log("Node", e.message); }
+  try { new EventTarget(); } catch(e) { console.log("EventTarget", e.message); }
+</script>
+</body></html>

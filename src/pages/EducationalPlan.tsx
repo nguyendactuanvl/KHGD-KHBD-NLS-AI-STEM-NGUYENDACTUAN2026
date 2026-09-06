@@ -3,10 +3,13 @@ import { KHGDRow } from "../types";
 import { fullPlan } from "../data/mockData";
 import { Download, Upload, Sparkles, Plus, Loader2 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { printElement } from '../lib/print';
+
 
 export function EducationalPlan() {
   const [plans, setPlans] = useState<KHGDRow[]>(fullPlan);
   const [isGenerating, setIsGenerating] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
   const [subject, setSubject] = useState("Toán");
   
   const [topic, setTopic] = useState("Đại số tổ hợp");
@@ -37,6 +40,11 @@ export function EducationalPlan() {
         reader.readAsDataURL(file);
       });
     }
+  };
+
+  
+  const handleExportPDF = () => {
+    printElement(exportRef.current, "Tai_lieu");
   };
 
   const handleExportWord = () => {
@@ -197,6 +205,13 @@ export function EducationalPlan() {
               Xuất Word
             </button>
             <button 
+              onClick={() => handleExportPDF()}
+              className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
+            >
+              <span className="text-xs font-bold border-2 border-current px-1 rounded">PDF</span>
+              Xuất PDF
+            </button>
+            <button 
               onClick={generateAIPlan}
               disabled={isGenerating}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-70"
@@ -210,7 +225,7 @@ export function EducationalPlan() {
 
       <div className="p-8">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" ref={exportRef}>
             {/* We keep a hidden simplified version of the table just for export, or we can use the same */}
             <div id="khgd-table-export">
               <table className="w-full text-sm text-left border-collapse">

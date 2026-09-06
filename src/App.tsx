@@ -11,6 +11,7 @@ import { Circulars } from "./pages/Circulars";
 import { HistoryPage } from "./pages/HistoryPage";
 import { Worksheets } from "./pages/Worksheets";
 import { SettingsModal } from "./components/SettingsModal";
+import { ExerciseSolver } from './pages/ExerciseSolver';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("khgd");
@@ -33,9 +34,10 @@ export default function App() {
       <main className="flex-1 overflow-y-auto">
         {activeTab === "khgd" && <EducationalPlan />}
         {activeTab === "khdh" && <LessonPlan />}
+        {activeTab === "worksheets" && <Worksheets />}
+        {activeTab === "exercise" && <ExerciseSolver />}
         {activeTab === "circulars" && <Circulars />}
         {activeTab === "history" && <HistoryPage />}
-        {activeTab === "worksheets" && <Worksheets />}
       </main>
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>

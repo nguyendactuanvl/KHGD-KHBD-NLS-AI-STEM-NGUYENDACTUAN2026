@@ -6,7 +6,26 @@ export const getHistory = (): HistoryItem[] => {
   const data = localStorage.getItem(HISTORY_KEY);
   if (!data) return [];
   try {
-    return JSON.parse(data);
+    const items = JSON.parse(data);
+    return items.map((item: any) => {
+      if (item.content && typeof item.content === 'object') {
+        // Try to extract text if it was a GenerateContentResponse object
+        let textContent = '';
+        try {
+          if (item.content.candidates && item.content.candidates[0]?.content?.parts) {
+            textContent = item.content.candidates[0].content.parts.map((p: any) => p.text).join('');
+          } else if (item.content.text) {
+            textContent = typeof item.content.text === 'function' ? item.content.text() : item.content.text;
+          } else {
+            textContent = JSON.stringify(item.content);
+          }
+        } catch(e) {
+          textContent = "[Lỗi định dạng dữ liệu]";
+        }
+        return { ...item, content: textContent };
+      }
+      return item;
+    });
   } catch (e) {
     return [];
   }

@@ -9,6 +9,8 @@ import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { cn } from "../lib/utils";
+import { printElement } from '../lib/print';
+
 
 export function HistoryPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -40,11 +42,44 @@ export function HistoryPage() {
     }
   };
 
+  
+  const handleExportPDF = () => {
+    printElement(exportRef.current, "Lich_su");
+  };
+
   const handleExportWord = (item: HistoryItem) => {
+        const clone = exportRef.current.cloneNode(true) as HTMLElement;
+    
+    // Extract MathML from KaTeX for native Word Equation support
+    const katexElements = clone.querySelectorAll('.katex');
+    katexElements.forEach(el => {
+      const mathNode = el.querySelector('.katex-mathml math');
+      if (mathNode) {
+        const mathClone = mathNode.cloneNode(true) as Element;
+        
+        // Remove annotation tags completely
+        const annotations = mathClone.querySelectorAll('annotation');
+        annotations.forEach(a => a.remove());
+        
+        // Remove semantics tag but keep its children to avoid Word confusion
+        const semantics = mathClone.querySelector('semantics');
+        if (semantics) {
+           while (semantics.firstChild) {
+               mathClone.insertBefore(semantics.firstChild, semantics);
+           }
+           semantics.remove();
+        }
+        
+        el.parentNode?.replaceChild(mathClone, el);
+      }
+    });
+    
+    const htmlToExport = clone.innerHTML;
+    if (!exportRef.current) return;
     const htmlContent = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head><meta charset='utf-8'><title>Export HTML To Doc</title></head><body>
-      \${viewingItem?.id === item.id && exportRef.current ? exportRef.current.innerHTML : "Vui lòng 'Xem chi tiết' trước khi tải xuống để đảm bảo định dạng."}
+      \${viewingItem?.id === item.id && exportRef.current ? htmlToExport : "Vui lòng 'Xem chi tiết' trước khi tải xuống để đảm bảo định dạng."}
       </body></html>
     `;
     
@@ -133,7 +168,7 @@ export function HistoryPage() {
                 >
                   <div className="flex justify-between items-start mb-1">
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                      {item.type === "PHT" ? "Phiếu bài tập" : (item.grade === 0 ? "Khác" : `Lớp ${item.grade}`)} • {item.subject}
+                      {item.type === "GBT" ? "Giải bài tập" : item.type === "PHT" ? "Phiếu bài tập" : (item.grade === 0 ? "Khác" : `Lớp ${item.grade}`)} • {item.subject}
                     </span>
                     <span className="text-xs text-slate-400">
                       {new Date(item.createdAt).toLocaleDateString('vi-VN')}
@@ -174,6 +209,13 @@ export function HistoryPage() {
               >
                 <Download className="w-4 h-4" />
                 <span>Tải Word (.doc)</span>
+              </button>
+              <button 
+                onClick={() => handleExportPDF()}
+                className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors shadow-sm"
+              >
+                <span className="text-xs font-bold border-2 border-current px-1 rounded">PDF</span>
+                <span>Tải PDF</span>
               </button>
             </div>
             <div className="p-8 overflow-y-auto flex-1">

@@ -19,7 +19,7 @@ export interface Circular {
 
 export interface HistoryItem {
   id: string;
-  type: "KHBD" | "KHGD" | "PHT";
+  type: "KHBD" | "KHGD" | "PHT" | "GBT";
   grade: number; // 10, 11, 12
   subject: string;
   lessonName: string;

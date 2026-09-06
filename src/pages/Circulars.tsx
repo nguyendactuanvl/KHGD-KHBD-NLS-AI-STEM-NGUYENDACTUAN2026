@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Circular } from "../types";
 import { FileText, ShieldCheck, AlertCircle } from "lucide-react";
+import { printElement } from '../lib/print';
 
 export function Circulars() {
   const [circulars, setCirculars] = useState<Circular[]>([]);

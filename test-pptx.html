@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<script type="module">
+import pptxgen from "./node_modules/pptxgenjs/dist/pptxgen.es.js";
+try {
+  const pres = new pptxgen();
+  console.log("Success", pres);
+} catch (e) {
+  console.log("Error", e);
+}
+</script>
+</body>
+</html>

@@ -149,7 +149,7 @@ Yêu cầu định dạng và nội dung (dùng cú pháp Markdown):
 1. **Phân chia tiết học**: BẮT BUỘC phải phân bổ rõ ràng tiến trình dạy học thành ${periods || "1"} tiết học. Mỗi tiết phải ghi rõ "Tiết 1: ... (45 phút)", "Tiết 2: ... (45 phút)", v.v... đảm bảo khối lượng nội dung và các hoạt động vừa vặn cho đúng 45 phút/tiết.
 2. **Tuyệt đối KHÔNG sử dụng thẻ HTML \`<br>\` hoặc \`<br/>\`**: Hãy sử dụng dấu xuống dòng chuẩn của Markdown (Enter 2 lần) để ngắt đoạn.
 3. **Tô màu Năng lực số (NLS) và Năng lực AI**: Khi nhắc đến phần mềm, công cụ thiết bị số, Năng lực số hoặc công cụ AI trong bài, BẮT BUỘC phải bọc trong thẻ HTML \`<mark style="background-color: #dbeafe; color: #1d4ed8; font-weight: bold; padding: 2px 4px; border-radius: 4px;">Tên phần mềm / NLS</mark>\` để tô màu xanh nổi bật.
-4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Đặt công thức trên cùng 1 dòng trong cặp dấu \`$\` (ví dụ: $x^2 + y^2 = R^2$), hoặc trên 1 dòng riêng trong cặp dấu \`$\` (ví dụ: \`$\int f(x)dx$\`). Không dùng các ký tự Unicode mô phỏng công thức.
+4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Sử dụng duy nhất dấu \$ cho công thức trong dòng (ví dụ: $a+b=c$) và \$\$ cho công thức riêng (ví dụ: $x^2$). Không dùng các ký tự Unicode mô phỏng công thức.
 5. **Bảng biểu**: Sử dụng chuẩn bảng Markdown đẹp mắt (Markdown tables) để phân chia rõ ràng Mục tiêu, Nội dung, Sản phẩm, Tổ chức thực hiện.
 6. **I. MỤC TIÊU**: Trình bày rõ ràng Kiến thức, Năng lực số, Năng lực AI, và Yêu cầu STEM. Các mã chỉ báo (như [3.1.NC1a]) phải được giữ nguyên và giải thích ngắn gọn cách đạt được trong bài.
 7. **II. THIẾT BỊ DẠY HỌC VÀ HỌC LIỆU**: Ghi rõ các thiết bị số, phần mềm, công cụ AI cần thiết.
@@ -206,7 +206,7 @@ Yêu cầu định dạng và nội dung (dùng cú pháp Markdown):
 1. **Phân chia tiết học**: BẮT BUỘC dựa vào số tiết trích xuất được để phân bổ rõ ràng tiến trình dạy học. Ví dụ bài có 2 tiết thì phải ghi rõ "Tiết 1: ... (45 phút)", "Tiết 2: ... (45 phút)". Mỗi tiết đảm bảo thời lượng đúng 45 phút.
 2. **Tuyệt đối KHÔNG sử dụng thẻ HTML \`<br>\` hoặc \`<br/>\`**: Hãy sử dụng dấu xuống dòng chuẩn của Markdown (Enter 2 lần) để ngắt đoạn.
 3. **Tô màu Năng lực số (NLS) và Năng lực AI**: Khi nhắc đến phần mềm, công cụ thiết bị số, Năng lực số hoặc công cụ AI trong bài, BẮT BUỘC phải bọc trong thẻ HTML \`<mark style="background-color: #dbeafe; color: #1d4ed8; font-weight: bold; padding: 2px 4px; border-radius: 4px;">Tên phần mềm / NLS</mark>\` để tô màu xanh nổi bật.
-4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Đặt công thức trên cùng 1 dòng trong cặp dấu \`$\` (ví dụ: $x^2 + y^2 = R^2$), hoặc trên 1 dòng riêng trong cặp dấu \`$\` (ví dụ: \`$\int f(x)dx$\`). Không dùng các ký tự Unicode mô phỏng công thức.
+4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Sử dụng duy nhất dấu \$ cho công thức trong dòng (ví dụ: $a+b=c$) và \$\$ cho công thức riêng (ví dụ: $x^2$). Không dùng các ký tự Unicode mô phỏng công thức.
 5. **Bảng biểu**: Sử dụng chuẩn bảng Markdown đẹp mắt (Markdown tables) để phân chia rõ ràng Mục tiêu, Nội dung, Sản phẩm, Tổ chức thực hiện.
 6. **I. MỤC TIÊU**: Trình bày rõ ràng Kiến thức, Năng lực số, Năng lực AI, và Yêu cầu STEM. Các mã chỉ báo (như [3.1.NC1a]) phải được giữ nguyên và giải thích ngắn gọn cách đạt được trong bài.
 7. **II. THIẾT BỊ DẠY HỌC VÀ HỌC LIỆU**: Ghi rõ các thiết bị số, phần mềm, công cụ AI cần thiết.
@@ -276,7 +276,7 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế. Nếu không tìm th
          - Hình thức: ${type || "Kết hợp trắc nghiệm và tự luận"}.
          - Phân hóa từ cơ bản đến vận dụng.
       4. Trình bày rõ ràng, để lại khoảng trống hợp lý giả định học sinh sẽ làm trực tiếp vào phiếu.
-      5. ĐỐI VỚI CÁC MÔN KHOA HỌC (Toán, Lý, Hóa, Sinh, Tin học): BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức toán học, phương trình phản ứng, hoặc biểu thức. Sử dụng dấu \$\` cho công thức trong dòng và \`$$\` cho công thức trên một dòng riêng.
+      5. ĐỐI VỚI CÁC MÔN KHOA HỌC (Toán, Lý, Hóa, Sinh, Tin học): BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức toán học, phương trình phản ứng, hoặc biểu thức. Sử dụng duy nhất dấu \$ cho công thức trong dòng và \$\$ cho công thức riêng.
       6. ĐÁP ÁN: Ở cuối tài liệu, hãy cung cấp phần Hướng dẫn giải/Đáp án, phân cách bằng một tiêu đề thật rõ ràng (ví dụ: "--- HƯỚNG DẪN CHẤM / ĐÁP ÁN ---") để giáo viên có thể cắt/xóa trước khi in cho học sinh.`;
 
       const response = await generateWithFallback(req, {
@@ -304,7 +304,110 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế. Nếu không tìm th
   });
 
   // API route to check circulars
-  app.get("/api/circulars", (req, res) => {
+  
+  // API route to solve exercises
+  
+  app.post("/api/generate-similar", async (req, res) => {
+    try {
+      const { files } = req.body;
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No files provided" });
+      }
+
+      const prompt = `Bạn là một chuyên gia giáo dục. Dưới đây là bài tập, đề thi hoặc tài liệu mà giáo viên cung cấp.
+YÊU CẦU:
+1. Đọc và phân tích cấu trúc, độ khó, dạng bài, và kiến thức trọng tâm của tài liệu gốc.
+2. TẠO RA MỘT ĐỀ BÀI HOẶC BỘ BÀI TẬP TƯƠNG TỰ (cùng cấu trúc, độ khó, và dạng bài nhưng thay đổi số liệu, ngữ cảnh hoặc cách hỏi).
+3. CUNG CẤP LỜI GIẢI CHI TIẾT cho ĐỀ TƯƠNG TỰ vừa tạo.
+
+Định dạng đầu ra rõ ràng:
+## Đề bài tương tự
+[Nội dung đề vừa tạo]
+
+## Lời giải chi tiết
+[Các bước giải chi tiết cho đề tương tự]
+
+LƯU Ý ĐỐI VỚI CÔNG THỨC: BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức toán học, lý, hóa. Sử dụng duy nhất dấu $ cho công thức trong dòng và $$ cho công thức riêng. KHÔNG sử dụng ký tự Unicode mô phỏng công thức.`;
+
+      const response = await generateWithFallback(req, {
+        contents: [
+          {
+            role: "user",
+            parts: [
+              ...(files || []).map((f: any) => ({
+                inlineData: {
+                  data: f.data,
+                  mimeType: f.type || 'text/plain'
+                }
+              })),
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        config: {
+          temperature: 0.7,
+        }
+      });
+      
+      res.json({ result: response.text });
+    } catch (error: any) {
+      console.error("Error generating similar exercise:", error);
+      res.status(500).json({ error: error.message || "Failed to generate similar exercise" });
+    }
+  });
+
+app.post("/api/solve-exercise", async (req, res) => {
+    try {
+      const { files } = req.body;
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No files provided" });
+      }
+
+      const prompt = `Bạn là một giáo viên xuất sắc. Dưới đây là bài tập hoặc tài liệu học sinh đưa ra. 
+YÊU CẦU:
+1. Đọc nội dung bài tập từ file.
+2. Viết lại đề bài rõ ràng.
+3. Cung cấp lời giải chi tiết, giải thích cặn kẽ từng bước để học sinh dễ hiểu.
+4. Định dạng đầu ra thành 2 phần rõ rệt (dùng tiêu đề H2):
+## Đề bài
+[Nội dung đề]
+
+## Lời giải chi tiết
+[Các bước giải chi tiết]
+
+5. ĐỐI VỚI CÁC MÔN KHOA HỌC (Toán, Lý, Hóa, Sinh, Tin học): BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức toán học. Sử dụng duy nhất dấu $ cho công thức trong dòng và $$ cho công thức riêng (chữ to, đứng riêng một dòng). KHÔNG sử dụng ký tự Unicode mô phỏng công thức.`;
+
+      const response = await generateWithFallback(req, {
+        contents: [
+          {
+            role: "user",
+            parts: [
+              ...(files || []).map((f: any) => ({
+                inlineData: {
+                  data: f.data,
+                  mimeType: f.type || 'text/plain'
+                }
+              })),
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        config: {
+          temperature: 0.2,
+        }
+      });
+      res.json({ result: response.text });
+    } catch (error: any) {
+      console.error("AI Solve Exercise error:", error);
+      res.status(500).json({ error: "Lỗi trong quá trình giải bài tập: " + (error?.message || "Lỗi không xác định") });
+    }
+  });
+
+app.get("/api/circulars", (req, res) => {
     res.json([
       { id: "5512/BGDĐT-GDTrH", date: "18/12/2020", title: "Xây dựng và tổ chức thực hiện kế hoạch giáo dục của nhà trường" },
       { id: "3456/BGDĐT-GDPT", date: "27/6/2025", title: "Hướng dẫn triển khai thực hiện khung năng lực số cho học sinh phổ thông" },

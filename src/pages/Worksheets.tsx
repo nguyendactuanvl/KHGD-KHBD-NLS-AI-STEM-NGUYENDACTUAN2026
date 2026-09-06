@@ -7,6 +7,10 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { saveToHistory } from '../lib/history';
 import { cn } from "../lib/utils";
+import pptxgen from "pptxgenjs";
+import { Presentation } from "lucide-react";
+import { printElement } from '../lib/print';
+
 
 export function Worksheets() {
   const [selectedGrade, setSelectedGrade] = useState<number>(10);
@@ -93,6 +97,84 @@ export function Worksheets() {
     }
   };
 
+  
+  const handleExportPPTX = async () => {
+    if (!suggestion) return;
+    
+    setIsLoading(true);
+    try {
+      const pres = new pptxgen();
+      
+      // Basic markdown parsing for PPT
+      const sections = suggestion.split(/\n(?=##? )/g);
+      
+      // Cover slide
+      const coverSlide = pres.addSlide();
+      coverSlide.addText(customLessonName, { x: 1, y: 2, w: 8, h: 1, fontSize: 36, bold: true, align: 'center', color: '059669' });
+      coverSlide.addText("Môn: " + subject + " - Lớp " + selectedGrade, { x: 1, y: 3, w: 8, h: 1, fontSize: 24, align: 'center', color: '475569' });
+      
+      // Content slides
+      for (const section of sections) {
+        if (!section.trim()) continue;
+        
+        const lines = section.split('\n');
+        let title = "";
+        let bullets = [];
+        let currentText = "";
+        
+        for (const line of lines) {
+          if (line.startsWith('#')) {
+            if (currentText) bullets.push(currentText);
+            currentText = "";
+            title = line.replace(/^#+\s*/, '').replace(/\*\*/g, '');
+          } else if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+            if (currentText) bullets.push(currentText);
+            currentText = line.replace(/^[\-\*]\s*/, '').replace(/\*\*/g, '');
+          } else if (line.trim()) {
+            // Remove markdown table syntax and asterisks for simple text
+            let cleanLine = line.replace(/\*\*/g, '').replace(/\|/g, '').trim();
+            if (cleanLine && !cleanLine.startsWith(':---')) {
+               currentText += (currentText ? "\n" : "") + cleanLine;
+            }
+          }
+        }
+        if (currentText) bullets.push(currentText);
+        
+        // Chunk bullets if too many
+        const chunkSize = 5;
+        for (let i = 0; i < bullets.length; i += chunkSize) {
+            const slideBullets = bullets.slice(i, i + chunkSize);
+            const slide = pres.addSlide();
+            
+            // Clean math syntax for PPTX since it doesn't render latex natively easily this way
+            const cleanTitle = title.replace(/\$/g, '');
+            slide.addText(cleanTitle || "Nội dung", { x: 0.5, y: 0.5, w: 9, h: 0.8, fontSize: 28, bold: true, color: '0f172a' });
+            
+            const bulletItems = slideBullets.map(b => ({
+              text: b.replace(/\$[^\$]+\$/g, '(Công thức)').substring(0, 300) + (b.length > 300 ? '...' : ''), 
+              options: { bullet: true, fontSize: 18, color: '334155' }
+            }));
+            
+            if (bulletItems.length > 0) {
+              slide.addText(bulletItems, { x: 0.5, y: 1.5, w: 9, h: 3.5, valign: 'top' });
+            }
+        }
+      }
+      
+      await pres.writeFile({ fileName: `BaiGiang_${customLessonName.replace(/\s+/g, '_')}.pptx` });
+    } catch (error) {
+      console.error("Export PPTX error", error);
+      alert("Có lỗi xảy ra khi xuất file PowerPoint");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  
+  const handleExportPDF = () => {
+    printElement(exportRef.current, "Tai_lieu");
+  };
+
   const handleExportWord = () => {
     if (!suggestion || !exportRef.current) {
       if (isEditing) {
@@ -101,8 +183,34 @@ export function Worksheets() {
       return;
     }
 
+    const clone = exportRef.current.cloneNode(true) as HTMLElement;
+    
+    // Extract MathML from KaTeX for native Word Equation support
+    const katexElements = clone.querySelectorAll('.katex');
+    katexElements.forEach(el => {
+      const mathNode = el.querySelector('.katex-mathml math');
+      if (mathNode) {
+        const mathClone = mathNode.cloneNode(true) as Element;
+        
+        // Remove annotation tags completely
+        const annotations = mathClone.querySelectorAll('annotation');
+        annotations.forEach(a => a.remove());
+        
+        // Remove semantics tag but keep its children to avoid Word confusion
+        const semantics = mathClone.querySelector('semantics');
+        if (semantics) {
+           while (semantics.firstChild) {
+               mathClone.insertBefore(semantics.firstChild, semantics);
+           }
+           semantics.remove();
+        }
+        
+        el.parentNode?.replaceChild(mathClone, el);
+      }
+    });
+
     const htmlContent = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.openxmlformats.org/officeDocument/2006/math' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
         <meta charset='utf-8'>
         <title>Export HTML To Doc</title>
@@ -113,12 +221,13 @@ export function Worksheets() {
           h3 { font-size: 14pt; margin-top: 15px; }
           table { border-collapse: collapse; width: 100%; margin: 15px 0; }
           th, td { border: 1px solid black; padding: 8px; }
-          .katex-mathml { display: none; } /* Hide MathML from Word export */
+          .katex-html { display: none; }
+          .katex-mathml { display: block; font-family: "Cambria Math", serif; }
           .katex { font-family: 'Cambria Math', serif; } /* Attempt fallback for math in Word */
         </style>
       </head>
       <body>
-        ${exportRef.current.innerHTML}
+        ${clone.innerHTML}
       </body>
       </html>
     `;
@@ -285,6 +394,17 @@ export function Worksheets() {
                 >
                   <Download className="w-4 h-4" /> Xuất Word
                 </button>
+                <button
+                  onClick={handleExportPPTX}
+                  className={cn(
+                    "px-4 py-2 text-white font-medium rounded-lg flex items-center gap-2 shadow-sm transition-colors",
+                    isEditing ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                  )}
+                  title={isEditing ? "Chuyển sang chế độ xem trước để tải xuống" : ""}
+                >
+                  <Presentation className="w-4 h-4" /> Xuất PPTX
+                </button>
+
               </>
             )}
           </div>
