@@ -7,12 +7,35 @@ import { cn } from "../lib/utils";
 export function EducationalPlan() {
   const [plans, setPlans] = useState<KHGDRow[]>(fullPlan);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [subject, setSubject] = useState("Toán");
+  
+  const [topic, setTopic] = useState("Đại số tổ hợp");
+  const [uploadedFiles, setUploadedFiles] = useState<{data: string, type: string, name: string}[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-       alert(`Đã tải lên và phân tích thành công file: ${e.target.files[0].name}. Giả lập AI: Hệ thống đã nhận diện đầy đủ dữ liệu của Khối 10, Khối 11, Khối 12.`);
-       setPlans(fullPlan); 
+      const filesArray = Array.from(e.target.files);
+      filesArray.forEach(file => {
+        const fileType = file.type || '';
+        const validTypes = ['application/pdf', 'text/plain', 'text/csv', 'text/html'];
+        if (!validTypes.includes(fileType) && !file.name.match(/\.(pdf|txt|csv|html)$/i)) {
+          alert(`File "${file.name}" không được hỗ trợ. Trí tuệ nhân tạo (AI) hiện tại chỉ có thể đọc được các định dạng văn bản chuẩn như PDF, TXT, CSV, HTML. Vui lòng "Lưu dưới dạng" (Save As / Export) file Word/Excel của bạn sang định dạng PDF trước khi tải lên.`);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target?.result?.toString().split(',')[1];
+          if (base64) {
+            setUploadedFiles(prev => [...prev, {
+              data: base64,
+              type: file.type || 'text/plain',
+              name: file.name
+            }]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     }
   };
 
@@ -59,16 +82,38 @@ export function EducationalPlan() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || ""),
         },
         body: JSON.stringify({
-          subject: "Toán",
-          grade: "10",
-          topic: "Đại số tổ hợp"
+          subject,
+          grade: "10, 11, 12",
+          topic,
+          files: uploadedFiles
         }),
       });
       
+      if (!response.ok) {
+        let errorMsg = "Lỗi khi kết nối với AI (API trả về lỗi).";
+        try {
+          const text = await response.text();
+          try {
+             const errorData = JSON.parse(text);
+             errorMsg = errorData.error || errorMsg;
+          } catch(e) {
+             if (response.status === 503 || response.status === 504 || response.status === 502) {
+                errorMsg = "Hệ thống đang quá tải hoặc hết thời gian chờ. Vui lòng thử lại sau.";
+             } else {
+                errorMsg = `Lỗi hệ thống (${response.status}): Không thể kết nối với máy chủ.`;
+             }
+          }
+        } catch (e) {
+          // ignore
+        }
+        throw new Error(errorMsg);
+      }
+      
       const data = await response.json();
-      if (data && data.length > 0) {
+      if (data && Array.isArray(data) && data.length > 0) {
         const newPlans = data.map((item: any, index: number) => ({
           id: Date.now().toString() + index,
           grade: 10,
@@ -99,26 +144,51 @@ export function EducationalPlan() {
     <div className="flex-1 bg-slate-50 min-h-screen">
       <div className="bg-white px-8 py-6 border-b border-slate-200">
         <div className="flex justify-between items-center">
-          <div>
+            <div className="flex-1">
             <h2 className="text-2xl font-bold text-slate-800">Kế hoạch giáo dục</h2>
-            <p className="text-slate-500 mt-1">Cập nhật theo Công văn 5512 và QĐ 2422 (Năm học 2026-2027)</p>
+            <p className="text-slate-500 mt-1">Cập nhật theo Công văn 5512 và QĐ 2422</p>
+            
+            <div className="flex flex-wrap gap-3 mt-4 items-end">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Môn học</label>
+                <select value={subject} onChange={(e) => setSubject(e.target.value)} className="w-48 px-3 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
+                <option value="Ngữ văn">Ngữ văn</option>\n                <option value="Toán">Toán</option>\n                <option value="Tiếng Anh">Tiếng Anh</option>\n                <option value="Giáo dục thể chất">Giáo dục thể chất</option>\n                <option value="Lịch sử">Lịch sử</option>\n                <option value="Địa lí">Địa lí</option>\n                <option value="Giáo dục kinh tế và pháp luật">Giáo dục kinh tế và pháp luật</option>\n                <option value="Vật lí">Vật lí</option>\n                <option value="Hoá học">Hoá học</option>\n                <option value="Sinh học">Sinh học</option>\n                <option value="Công nghệ">Công nghệ</option>\n                <option value="Tin học">Tin học</option>\n                <option value="Âm nhạc">Âm nhạc</option>\n                <option value="Mĩ thuật">Mĩ thuật</option>\n                <option value="Hoạt động trải nghiệm, hướng nghiệp">Hoạt động trải nghiệm, hướng nghiệp</option>\n                <option value="Giáo dục quốc phòng và an ninh">Giáo dục quốc phòng và an ninh</option>\n                <option value="Chuyên đề học tập">Chuyên đề học tập</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Chủ đề</label>
+                <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} className="w-48 px-3 py-1.5 border border-slate-300 rounded-md text-sm" />
+              </div>
+              
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden" 
+                accept=".pdf,.txt,.csv,.html"
+                multiple
+              />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 text-sm"
+              >
+                <Upload className="h-4 w-4" />
+                Tải liệu ({uploadedFiles.length})
+              </button>
+            </div>
+            {uploadedFiles.length > 0 && (
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {uploadedFiles.map((f, i) => (
+                  <span key={i} className="text-xs bg-slate-200 text-slate-700 px-2 py-1 rounded-full flex items-center gap-1">
+                    {f.name}
+                    <button onClick={() => setUploadedFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold ml-1 hover:text-red-700">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-3">
-            <input 
-              type="file" 
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              className="hidden" 
-              accept=".docx,.xlsx,.xls"
-            />
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              <Upload className="h-4 w-4" />
-              Tải lên KHGD
-            </button>
             <button 
               onClick={handleExportWord}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

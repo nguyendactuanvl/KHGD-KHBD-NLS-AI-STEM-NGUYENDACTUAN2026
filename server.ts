@@ -3,7 +3,51 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+function getAiClient(req: express.Request) {
+  let customKey = req.headers['x-gemini-api-key'] as string;
+  if (customKey) {
+    try {
+      customKey = decodeURIComponent(customKey);
+    } catch (e) {
+      // Ignore invalid decode
+    }
+  }
+  
+  let apiKey = customKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing Gemini API Key");
+  }
+  
+  // Remove any non-ASCII characters or whitespace that might have been accidentally pasted
+  apiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
+  
+  return new GoogleGenAI({ apiKey });
+}
+
+// Helper function to bypass quota limits by using fallback models
+async function generateWithFallback(req: express.Request, payloadOptions: any) {
+  const client = getAiClient(req);
+  const models = ["gemini-3.6-flash", "gemini-3.1-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
+  
+  let lastError: any;
+  for (const model of models) {
+    try {
+      console.log(`Trying model ${model}...`);
+      const payload = { ...payloadOptions, model };
+      const response = await client.models.generateContent(payload);
+      return response;
+    } catch (error: any) {
+      console.error(`Model ${model} failed:`, error?.message);
+      lastError = error;
+      const errorMsg = error?.message || "";
+      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429 || errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503 || error?.status === 500 || error?.status === 404 || errorMsg.includes("no longer available")) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
 
 async function startServer() {
   const app = express();
@@ -14,7 +58,7 @@ async function startServer() {
   // API route to generate Educational Plan (KHGD) suggestions
   app.post("/api/generate-plan", async (req, res) => {
     try {
-      const { subject, grade, topic } = req.body;
+      const { subject, grade, topic, files } = req.body;
       
       const prompt = `Bạn là một Tổ trưởng chuyên môn và chuyên gia giáo dục. Hãy tạo/bổ sung một mẫu Kế hoạch giáo dục (KHGD) cho môn ${subject}, lớp ${grade}, chủ đề "${topic}".
       Giữ nguyên cấu trúc KHGD gốc (của công văn 5512/BGDĐT-GDTrH) và chỉ bổ sung các cột còn thiếu theo yêu cầu chuẩn của các công văn mới nhất về Năng lực số (NLS) (CV 3456) và Năng lực AI (QĐ 2422).
@@ -27,9 +71,27 @@ async function startServer() {
       
       Trả về kết quả dưới dạng danh sách JSON array với các thuộc tính: lesson, periods, requirement, digitalComp, aiComp, stem, note.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
+      let contents: any = prompt;
+      if (files && files.length > 0) {
+        contents = [
+          {
+            role: "user",
+            parts: [
+              ...files.map((f: any) => ({
+                inlineData: {
+                  data: f.data,
+                  mimeType: f.type || 'text/plain'
+                }
+              })),
+              {
+                text: prompt
+              }
+            ]
+          }
+        ];
+      }
+      const response = await generateWithFallback(req, {
+        contents: contents,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -53,8 +115,18 @@ async function startServer() {
 
       const data = JSON.parse(response.text || "[]");
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Generation error:", error);
+      const errorMsg = error?.message || "";
+      if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
+        return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
+      }
+      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
+        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
+      }
+      if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
+        return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
+      }
       res.status(500).json({ error: "Failed to generate plan" });
     }
   });
@@ -62,26 +134,27 @@ async function startServer() {
   // API route to generate Detailed Lesson Plan (Kế hoạch bài dạy)
   app.post("/api/generate-lesson-plan", async (req, res) => {
     try {
-      const { lesson, requirement, digitalComp, aiComp, stem, grade } = req.body;
-      
-    const prompt = `Bạn là một giáo viên xuất sắc và chuyên gia giáo dục. Hãy soạn chi tiết một Kế hoạch bài dạy (Giáo án) theo chuẩn Công văn 5512/BGDĐT-GDTrH cho bài học: "${lesson}" (Khối lớp ${grade}).
+            const { lesson, requirement, digitalComp, aiComp, stem, grade, subject, periods } = req.body;
+    
+      const prompt = `Bạn là một giáo viên xuất sắc và chuyên gia giáo dục. Hãy soạn chi tiết một Kế hoạch bài dạy (Giáo án) môn ${subject || "chung"} theo chuẩn Công văn 5512/BGDĐT-GDTrH cho bài học: "${lesson}" (Khối lớp ${grade}).
 
 Dựa vào các dữ liệu bắt buộc sau từ Kế hoạch giáo dục:
+- Số tiết: ${periods || "1"} tiết (Mỗi tiết chuẩn đúng 45 phút)
 - Yêu cầu cần đạt: ${requirement || "Không có yêu cầu đặc thù"}
 - Năng lực số (theo CV 3456): ${digitalComp || "Không áp dụng"}
 - Năng lực AI (theo QĐ 2422): ${aiComp || "Không áp dụng"}
 - Tích hợp STEM/STEAM: ${stem || "Không áp dụng"}
 
 Yêu cầu định dạng và nội dung (dùng cú pháp Markdown):
-1. **Tuyệt đối KHÔNG sử dụng thẻ HTML \`<br>\` hoặc \`<br/>\`**: Hãy sử dụng dấu xuống dòng chuẩn của Markdown (Enter 2 lần) để ngắt đoạn.
-2. **Tô màu Năng lực số (NLS) và Năng lực AI**: Khi nhắc đến phần mềm, công cụ thiết bị số, Năng lực số hoặc công cụ AI trong bài, BẮT BUỘC phải bọc trong thẻ HTML \`<mark style="background-color: #dbeafe; color: #1d4ed8; font-weight: bold; padding: 2px 4px; border-radius: 4px;">Tên phần mềm / NLS</mark>\` để tô màu xanh nổi bật.
-3. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Đặt công thức trên cùng 1 dòng trong cặp dấu \`$\` (ví dụ: $x^2 + y^2 = R^2$), hoặc trên 1 dòng riêng trong cặp dấu \`$$\` (ví dụ: \`$$\\int f(x)dx$$\`). Không dùng các ký tự Unicode mô phỏng công thức.
-4. **Bảng biểu**: Sử dụng chuẩn bảng Markdown đẹp mắt (Markdown tables) để phân chia rõ ràng Mục tiêu, Nội dung, Sản phẩm, Tổ chức thực hiện.
-5. **Hình vẽ minh họa**: Hãy chèn 1-2 hình ảnh minh họa sinh động (sơ đồ, đồ thị) bằng Markdown. Dùng cú pháp: \`![Mô tả](https://image.pollinations.ai/prompt/{tu_khoa_tieng_anh}?width=800&height=400&nologo=true)\`. Thay \`{tu_khoa_tieng_anh}\` bằng mô tả ảnh chi tiết bằng TIẾNG ANH (dùng %20 thay khoảng trắng).
+1. **Phân chia tiết học**: BẮT BUỘC phải phân bổ rõ ràng tiến trình dạy học thành ${periods || "1"} tiết học. Mỗi tiết phải ghi rõ "Tiết 1: ... (45 phút)", "Tiết 2: ... (45 phút)", v.v... đảm bảo khối lượng nội dung và các hoạt động vừa vặn cho đúng 45 phút/tiết.
+2. **Tuyệt đối KHÔNG sử dụng thẻ HTML \`<br>\` hoặc \`<br/>\`**: Hãy sử dụng dấu xuống dòng chuẩn của Markdown (Enter 2 lần) để ngắt đoạn.
+3. **Tô màu Năng lực số (NLS) và Năng lực AI**: Khi nhắc đến phần mềm, công cụ thiết bị số, Năng lực số hoặc công cụ AI trong bài, BẮT BUỘC phải bọc trong thẻ HTML \`<mark style="background-color: #dbeafe; color: #1d4ed8; font-weight: bold; padding: 2px 4px; border-radius: 4px;">Tên phần mềm / NLS</mark>\` để tô màu xanh nổi bật.
+4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Đặt công thức trên cùng 1 dòng trong cặp dấu \`$\` (ví dụ: $x^2 + y^2 = R^2$), hoặc trên 1 dòng riêng trong cặp dấu \`$\` (ví dụ: \`$\int f(x)dx$\`). Không dùng các ký tự Unicode mô phỏng công thức.
+5. **Bảng biểu**: Sử dụng chuẩn bảng Markdown đẹp mắt (Markdown tables) để phân chia rõ ràng Mục tiêu, Nội dung, Sản phẩm, Tổ chức thực hiện.
 6. **I. MỤC TIÊU**: Trình bày rõ ràng Kiến thức, Năng lực số, Năng lực AI, và Yêu cầu STEM. Các mã chỉ báo (như [3.1.NC1a]) phải được giữ nguyên và giải thích ngắn gọn cách đạt được trong bài.
 7. **II. THIẾT BỊ DẠY HỌC VÀ HỌC LIỆU**: Ghi rõ các thiết bị số, phần mềm, công cụ AI cần thiết.
 8. **III. TIẾN TRÌNH DẠY HỌC**:
-   Phải thiết kế theo 4 hoạt động chuẩn: 
+   Trình bày tiến trình giảng dạy rõ ràng theo từng tiết (Tiết 1, Tiết 2...). Phải thiết kế theo 4 hoạt động chuẩn: 
    - Hoạt động 1: Xác định vấn đề / Nhiệm vụ học tập.
    - Hoạt động 2: Hình thành kiến thức mới.
    - Hoạt động 3: Luyện tập.
@@ -90,8 +163,7 @@ Yêu cầu định dạng và nội dung (dùng cú pháp Markdown):
    
 Văn phong cần chuyên nghiệp, sư phạm, thực tế.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+      const response = await generateWithFallback(req, {
         contents: prompt,
         config: {
           temperature: 0.7,
@@ -102,8 +174,14 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế.`;
     } catch (error: any) {
       console.error("AI Generation error:", error);
       const errorMsg = error?.message || "";
-      if (errorMsg.includes("503") || errorMsg.includes("high demand") || error?.status === 503) {
-        return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải do nhu cầu sử dụng cao. Vui lòng thử lại sau vài giây." });
+      if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
+        return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
+      }
+      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
+        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
+      }
+      if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
+        return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
       }
       res.status(500).json({ error: "Failed to generate lesson plan" });
     }
@@ -112,11 +190,12 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế.`;
   // API route to generate Detailed Lesson Plan from uploaded file
   app.post("/api/generate-lesson-plan-file", async (req, res) => {
     try {
-      const { lesson, fileData, fileMimeType } = req.body;
+      const { lesson, subject, files } = req.body;
       
       const prompt = `Bạn là một giáo viên xuất sắc và chuyên gia giáo dục. Tôi đã tải lên một tài liệu Kế hoạch giáo dục (KHGD).
-Hãy tìm trong tài liệu này bài học có tên (hoặc gần giống với): "${lesson}".
+Dựa vào các tài liệu được cung cấp (Sách, Văn bản, KHDH...), hãy soạn chi tiết một Kế hoạch bài dạy (Giáo án) môn ${subject || "chung"} theo chuẩn Công văn 5512/BGDĐT-GDTrH cho bài học: "${lesson}".
 Trích xuất các thông tin về:
+- Số tiết (phân bổ thời gian cho bài học này)
 - Yêu cầu cần đạt
 - Năng lực số
 - Năng lực AI
@@ -124,35 +203,34 @@ Trích xuất các thông tin về:
 của chính bài học đó. Sau đó, sử dụng các thông tin này để soạn chi tiết một Kế hoạch bài dạy (Giáo án) theo chuẩn Công văn 5512/BGDĐT-GDTrH cho bài học đó.
 
 Yêu cầu định dạng và nội dung (dùng cú pháp Markdown):
-1. **Tuyệt đối KHÔNG sử dụng thẻ HTML \`<br>\` hoặc \`<br/>\`**: Hãy sử dụng dấu xuống dòng chuẩn của Markdown (Enter 2 lần) để ngắt đoạn.
-2. **Tô màu Năng lực số (NLS) và Năng lực AI**: Khi nhắc đến phần mềm, công cụ thiết bị số, Năng lực số hoặc công cụ AI trong bài, BẮT BUỘC phải bọc trong thẻ HTML \`<mark style="background-color: #dbeafe; color: #1d4ed8; font-weight: bold; padding: 2px 4px; border-radius: 4px;">Tên phần mềm / NLS</mark>\` để tô màu xanh nổi bật.
-3. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Đặt công thức trên cùng 1 dòng trong cặp dấu \`$\` (ví dụ: $x^2 + y^2 = R^2$), hoặc trên 1 dòng riêng trong cặp dấu \`$$\` (ví dụ: \`$$\\int f(x)dx$$\`). Không dùng các ký tự Unicode mô phỏng công thức.
-4. **Bảng biểu**: Sử dụng chuẩn bảng Markdown đẹp mắt (Markdown tables) để phân chia rõ ràng Mục tiêu, Nội dung, Sản phẩm, Tổ chức thực hiện.
-5. **Hình vẽ minh họa**: Hãy chèn 1-2 hình ảnh minh họa sinh động (sơ đồ, đồ thị) bằng Markdown. Dùng cú pháp: \`![Mô tả](https://image.pollinations.ai/prompt/{tu_khoa_tieng_anh}?width=800&height=400&nologo=true)\`. Thay \`{tu_khoa_tieng_anh}\` bằng mô tả ảnh chi tiết bằng TIẾNG ANH (dùng %20 thay khoảng trắng).
+1. **Phân chia tiết học**: BẮT BUỘC dựa vào số tiết trích xuất được để phân bổ rõ ràng tiến trình dạy học. Ví dụ bài có 2 tiết thì phải ghi rõ "Tiết 1: ... (45 phút)", "Tiết 2: ... (45 phút)". Mỗi tiết đảm bảo thời lượng đúng 45 phút.
+2. **Tuyệt đối KHÔNG sử dụng thẻ HTML \`<br>\` hoặc \`<br/>\`**: Hãy sử dụng dấu xuống dòng chuẩn của Markdown (Enter 2 lần) để ngắt đoạn.
+3. **Tô màu Năng lực số (NLS) và Năng lực AI**: Khi nhắc đến phần mềm, công cụ thiết bị số, Năng lực số hoặc công cụ AI trong bài, BẮT BUỘC phải bọc trong thẻ HTML \`<mark style="background-color: #dbeafe; color: #1d4ed8; font-weight: bold; padding: 2px 4px; border-radius: 4px;">Tên phần mềm / NLS</mark>\` để tô màu xanh nổi bật.
+4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Đặt công thức trên cùng 1 dòng trong cặp dấu \`$\` (ví dụ: $x^2 + y^2 = R^2$), hoặc trên 1 dòng riêng trong cặp dấu \`$\` (ví dụ: \`$\int f(x)dx$\`). Không dùng các ký tự Unicode mô phỏng công thức.
+5. **Bảng biểu**: Sử dụng chuẩn bảng Markdown đẹp mắt (Markdown tables) để phân chia rõ ràng Mục tiêu, Nội dung, Sản phẩm, Tổ chức thực hiện.
 6. **I. MỤC TIÊU**: Trình bày rõ ràng Kiến thức, Năng lực số, Năng lực AI, và Yêu cầu STEM. Các mã chỉ báo (như [3.1.NC1a]) phải được giữ nguyên và giải thích ngắn gọn cách đạt được trong bài.
 7. **II. THIẾT BỊ DẠY HỌC VÀ HỌC LIỆU**: Ghi rõ các thiết bị số, phần mềm, công cụ AI cần thiết.
 8. **III. TIẾN TRÌNH DẠY HỌC**:
-   Phải thiết kế theo 4 hoạt động chuẩn: 
+   Trình bày tiến trình giảng dạy rõ ràng theo từng tiết (Tiết 1, Tiết 2...). Phải thiết kế theo 4 hoạt động chuẩn: 
    - Hoạt động 1: Xác định vấn đề / Nhiệm vụ học tập.
    - Hoạt động 2: Hình thành kiến thức mới.
    - Hoạt động 3: Luyện tập.
    - Hoạt động 4: Vận dụng.
    Mỗi hoạt động phải trình bày rõ ràng bằng BẢNG (Mục tiêu, Nội dung, Sản phẩm, Tổ chức thực hiện). Đặc biệt, lồng ghép khéo léo việc sử dụng phần mềm, kỹ năng số, hoặc ứng dụng AI vào phần "Tổ chức thực hiện".
    
-Văn phong cần chuyên nghiệp, sư phạm, thực tế. Nếu không tìm thấy bài học trong tài liệu, hãy thông báo lỗi nhẹ nhàng và soạn một giáo án dự kiến.`;
+Văn phong cần chuyên nghiệp, sư phạm, thực tế. Nếu không tìm thấy bài học trong tài liệu, hãy thông báo lỗi nhẹ nhàng và soạn một giáo án dự kiến.`;;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+      const response = await generateWithFallback(req, {
         contents: [
           {
             role: "user",
             parts: [
-              {
+              ...(files || []).map((f: any) => ({
                 inlineData: {
-                  data: fileData,
-                  mimeType: fileMimeType
+                  data: f.data,
+                  mimeType: f.type || 'text/plain'
                 }
-              },
+              })),
               {
                 text: prompt
               }
@@ -168,13 +246,60 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế. Nếu không tìm th
     } catch (error: any) {
       console.error("AI File Generation error:", error);
       const errorMsg = error?.message || "";
+      if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
+        return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
+      }
       if (errorMsg.includes("Unsupported MIME type")) {
         return res.status(400).json({ error: "Định dạng file không được AI hỗ trợ. Vui lòng chuyển file sang định dạng PDF và thử lại." });
       }
-      if (errorMsg.includes("503") || errorMsg.includes("high demand") || error?.status === 503) {
-        return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải do nhu cầu sử dụng cao. Vui lòng thử lại sau vài giây." });
+      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
+        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
+      }
+      if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
+        return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
       }
       res.status(500).json({ error: "Failed to generate lesson plan from file" });
+    }
+  });
+
+  // API route to generate Worksheet (Phiếu học tập)
+  app.post("/api/generate-worksheet", async (req, res) => {
+    try {
+      const { lesson, subject, grade, type } = req.body;
+      
+      const prompt = `Bạn là một giáo viên xuất sắc môn ${subject || "chung"}. Hãy tạo một Phiếu học tập (Worksheet) thật chuyên nghiệp, trực quan cho học sinh lớp ${grade}, bài học/chủ đề: "${lesson}".
+      
+      YÊU CẦU:
+      1. Phần đầu: Tiêu đề phiếu học tập, Họ và tên học sinh, Lớp, Ngày.
+      2. Tóm tắt kiến thức trọng tâm (ngắn gọn, dễ hiểu, dùng bảng biểu nếu cần).
+      3. Hệ thống bài tập:
+         - Hình thức: ${type || "Kết hợp trắc nghiệm và tự luận"}.
+         - Phân hóa từ cơ bản đến vận dụng.
+      4. Trình bày rõ ràng, để lại khoảng trống hợp lý giả định học sinh sẽ làm trực tiếp vào phiếu.
+      5. ĐỐI VỚI CÁC MÔN KHOA HỌC (Toán, Lý, Hóa, Sinh, Tin học): BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức toán học, phương trình phản ứng, hoặc biểu thức. Sử dụng dấu \$\` cho công thức trong dòng và \`$$\` cho công thức trên một dòng riêng.
+      6. ĐÁP ÁN: Ở cuối tài liệu, hãy cung cấp phần Hướng dẫn giải/Đáp án, phân cách bằng một tiêu đề thật rõ ràng (ví dụ: "--- HƯỚNG DẪN CHẤM / ĐÁP ÁN ---") để giáo viên có thể cắt/xóa trước khi in cho học sinh.`;
+
+      const response = await generateWithFallback(req, {
+        contents: prompt,
+        config: {
+          temperature: 0.7,
+        }
+      });
+
+      res.json({ result: response.text });
+    } catch (error: any) {
+      console.error("AI Generation error:", error);
+      const errorMsg = error?.message || "";
+      if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
+        return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
+      }
+      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
+        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
+      }
+      if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
+        return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
+      }
+      res.status(500).json({ error: "Failed to generate worksheet" });
     }
   });
 

@@ -1,6 +1,6 @@
-import { KHGDRow } from "../types";
+const fs = require('fs');
 
-export const fullPlan: KHGDRow[] = [
+const fullPlanData = `export const fullPlan: KHGDRow[] = [
   // LỚP 10
   {
     id: "10-1", grade: 10, stt: 1,
@@ -1007,4 +1007,11 @@ export const fullPlan: KHGDRow[] = [
     stem: "Không", note: "Chuyên đề"
   }
 ];
+`;
 
+let currentCode = fs.readFileSync('src/data/mockData.ts', 'utf8');
+
+const regex = /export const fullPlan: KHGDRow\[\] = \[([\s\S]*?)\];/;
+currentCode = currentCode.replace(regex, fullPlanData);
+
+fs.writeFileSync('src/data/mockData.ts', currentCode);

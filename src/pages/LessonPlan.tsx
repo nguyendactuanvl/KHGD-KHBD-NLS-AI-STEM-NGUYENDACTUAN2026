@@ -6,6 +6,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
+import { saveToHistory } from '../lib/history';
 
 export function LessonPlan() {
   const [activeTab, setActiveTab] = useState<"system" | "upload">("system");
@@ -13,7 +14,9 @@ export function LessonPlan() {
   const [selectedLessonId, setSelectedLessonId] = useState<string>("");
   
   const [customLessonName, setCustomLessonName] = useState("");
-  const [uploadedFile, setUploadedFile] = useState<{ data: string, type: string, name: string } | null>(null);
+  const [subject, setSubject] = useState("Toán");
+  const [uploadedFiles, setUploadedFiles] = useState<{data: string, type: string, name: string}[]>([]);
+  
   
   const [suggestion, setSuggestion] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -42,43 +45,41 @@ export function LessonPlan() {
   }, [availableLessons]);
   
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const fileType = file.type || '';
-    const validTypes = ['application/pdf', 'text/plain', 'text/csv', 'text/html'];
-    
-    if (!validTypes.includes(fileType) && !file.name.match(/\.(pdf|txt|csv|html)$/i)) {
-      setError("AI hiện chỉ hỗ trợ đọc file định dạng PDF, TXT, CSV. Vui lòng xuất file Word/Excel sang định dạng PDF và tải lên lại.");
-      setUploadedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-    
-    setError(null);
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result?.toString().split(',')[1];
-      if (base64) {
+    if (e.target.files && e.target.files.length > 0) {
+      setError(null);
+      const filesArray = Array.from(e.target.files);
+      filesArray.forEach(file => {
+        const fileType = file.type || '';
+        const validTypes = ['application/pdf', 'text/plain', 'text/csv', 'text/html'];
+        if (!validTypes.includes(fileType) && !file.name.match(/\.(pdf|txt|csv|html)$/i)) {
+          alert(`File "${file.name}" không được hỗ trợ. Trí tuệ nhân tạo (AI) hiện tại chỉ có thể đọc được các định dạng văn bản chuẩn như PDF, TXT, CSV, HTML. Vui lòng "Lưu dưới dạng" (Save As / Export) file Word/Excel của bạn sang định dạng PDF trước khi tải lên.`);
+          return;
+        }
         let mimeType = fileType;
         if (!mimeType) {
           if (file.name.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
           else mimeType = 'text/plain';
         }
-        setUploadedFile({
-          data: base64,
-          type: mimeType,
-          name: file.name
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target?.result?.toString().split(',')[1];
+          if (base64) {
+            setUploadedFiles(prev => [...prev, {
+              data: base64,
+              type: mimeType,
+              name: file.name
+            }]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   };
 
   const generateLessonPlan = async () => {
     if (activeTab === "system" && !selectedLesson) return;
-    if (activeTab === "upload" && (!uploadedFile || !customLessonName.trim())) {
+    if (activeTab === "upload" && (!customLessonName.trim())) {
       setError("Vui lòng nhập tên bài học và tải lên file Kế hoạch giáo dục.");
       return;
     }
@@ -98,40 +99,59 @@ export function LessonPlan() {
           digitalComp: selectedLesson!.digitalComp,
           aiComp: selectedLesson!.aiComp,
           stem: selectedLesson!.stem,
-          grade: selectedLesson!.grade
+          grade: selectedLesson!.grade,
+          periods: selectedLesson!.periods,
+          subject: subject
         };
       } else {
         endpoint = '/api/generate-lesson-plan-file';
         payload = {
           lesson: customLessonName,
-          fileData: uploadedFile!.data,
-          fileMimeType: uploadedFile!.type
+          subject: subject,
+          files: uploadedFiles
         };
       }
       
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-gemini-api-key': encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
+        },
         body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
         let errorMsg = "Lỗi khi kết nối với AI (API trả về lỗi).";
         try {
-          const errorData = await response.json();
-          errorMsg = errorData.error || errorMsg;
-        } catch (e) {
-          if (response.status === 504 || response.status === 502) {
-            errorMsg = "Hệ thống đang quá tải hoặc hết thời gian chờ. Vui lòng thử lại sau.";
-          } else {
-            errorMsg = `Lỗi hệ thống (${response.status}): Không thể kết nối với máy chủ.`;
+          const text = await response.text();
+          try {
+             const errorData = JSON.parse(text);
+             errorMsg = errorData.error || errorMsg;
+          } catch(e) {
+             if (response.status === 503 || response.status === 504 || response.status === 502) {
+                errorMsg = "Hệ thống đang quá tải hoặc hết thời gian chờ. Vui lòng thử lại sau.";
+             } else {
+                errorMsg = `Lỗi hệ thống (${response.status}): Không thể kết nối với máy chủ.`;
+             }
           }
+        } catch (e) {
+          // ignore
         }
         throw new Error(errorMsg);
       }
 
       const data = await response.json();
       setSuggestion(data.result);
+      
+      // Save to history
+      saveToHistory({
+        type: "KHBD",
+        grade: activeTab === "system" && selectedLesson ? selectedLesson.grade : 0,
+        subject: subject,
+        lessonName: activeTab === "system" && selectedLesson ? selectedLesson.lesson : customLessonName,
+        content: data.result
+      });
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Không thể soạn giáo án lúc này. Vui lòng thử lại sau.");
@@ -279,6 +299,16 @@ export function LessonPlan() {
         ) : (
           <div className="space-y-4">
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Môn học</label>
+              <select 
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none mb-4 bg-white"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+              >
+                <option value="Ngữ văn">Ngữ văn</option>\n                <option value="Toán">Toán</option>\n                <option value="Tiếng Anh">Tiếng Anh</option>\n                <option value="Giáo dục thể chất">Giáo dục thể chất</option>\n                <option value="Lịch sử">Lịch sử</option>\n                <option value="Địa lí">Địa lí</option>\n                <option value="Giáo dục kinh tế và pháp luật">Giáo dục kinh tế và pháp luật</option>\n                <option value="Vật lí">Vật lí</option>\n                <option value="Hoá học">Hoá học</option>\n                <option value="Sinh học">Sinh học</option>\n                <option value="Công nghệ">Công nghệ</option>\n                <option value="Tin học">Tin học</option>\n                <option value="Âm nhạc">Âm nhạc</option>\n                <option value="Mĩ thuật">Mĩ thuật</option>\n                <option value="Hoạt động trải nghiệm, hướng nghiệp">Hoạt động trải nghiệm, hướng nghiệp</option>\n                <option value="Giáo dục quốc phòng và an ninh">Giáo dục quốc phòng và an ninh</option>\n                <option value="Chuyên đề học tập">Chuyên đề học tập</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Tên bài học cần soạn</label>
               <input 
                 type="text" 
@@ -296,20 +326,31 @@ export function LessonPlan() {
                 className="border-2 border-dashed border-slate-300 rounded-lg p-6 flex flex-col items-center justify-center text-slate-500 hover:bg-slate-50 hover:border-emerald-400 hover:text-emerald-600 transition-colors cursor-pointer"
               >
                 <Upload className="w-8 h-8 mb-2" />
-                <span className="text-sm font-medium">
-                  {uploadedFile ? uploadedFile.name : "Nhấn để tải lên tệp (PDF, TXT, CSV)"}
+                <span className="text-sm font-medium text-center">
+                  Nhấn để tải lên tài liệu tham khảo (Sách, Văn bản...) <br/> ({uploadedFiles.length} tệp đã chọn)
                 </span>
                 <input 
                   type="file" 
                   ref={fileInputRef} 
                   className="hidden" 
                   onChange={handleFileUpload}
-                  accept=".pdf,.txt,.csv"
+                  accept=".pdf,.txt,.csv,.html"
+                  multiple
                 />
               </div>
               <p className="text-xs text-slate-500 mt-2">
-                Hệ thống AI sẽ tự động đọc tệp để tìm kiếm các yêu cầu cần đạt, năng lực số, năng lực AI và STEM của bài học bạn yêu cầu. Vui lòng xuất Kế hoạch giáo dục từ Word/Excel sang định dạng PDF trước khi tải lên.
+                Hệ thống AI sẽ tự động đọc tệp để tìm kiếm các yêu cầu cần đạt, năng lực số, năng lực AI và STEM của bài học bạn yêu cầu.
               </p>
+              {uploadedFiles.length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {uploadedFiles.map((f, i) => (
+                    <span key={i} className="text-xs bg-slate-200 text-slate-700 px-2 py-1 rounded-full flex items-center gap-1">
+                      {f.name}
+                      <button onClick={(e) => { e.stopPropagation(); setUploadedFiles(prev => prev.filter((_, idx) => idx !== i)); }} className="text-red-500 font-bold ml-1 hover:text-red-700">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
