@@ -13,14 +13,14 @@ export function Circulars() {
   }, []);
 
   return (
-    <div className="flex-1 bg-slate-50 min-h-screen p-8">
+    <div className="flex-1 bg-slate-50 min-h-screen p-4 lg:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-slate-800">Bộ lọc thông tư & Văn bản</h2>
           <p className="text-slate-500 mt-1">Cập nhật tự động các quy định mới nhất từ Bộ GD&ĐT</p>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8 flex gap-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 lg:p-6 mb-8 flex gap-4">
           <ShieldCheck className="h-6 w-6 text-blue-600 shrink-0" />
           <div>
             <h3 className="font-semibold text-blue-900">Hệ thống đang hoạt động tốt</h3>

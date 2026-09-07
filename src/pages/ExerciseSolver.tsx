@@ -245,14 +245,14 @@ const handleSolve = async () => {
   }, [solution]);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+    <div className="max-w-7xl mx-auto space-y-6 p-4 lg:p-8">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-8">
         <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Trợ lý Giải Bài Tập Thông Minh</h2>
         
         {!solution && (
           <div className="max-w-2xl mx-auto">
             <div 
-              className="border-2 border-dashed border-slate-300 rounded-xl p-12 text-center hover:bg-slate-50 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[300px]"
+              className="border-2 border-dashed border-slate-300 rounded-xl p-6 lg:p-12 text-center hover:bg-slate-50 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[300px]"
               onClick={() => fileInputRef.current?.click()}
               onDragOver={handleDragOver}
               onDrop={handleDrop}

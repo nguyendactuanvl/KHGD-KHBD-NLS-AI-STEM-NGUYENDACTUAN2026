@@ -1,44 +1,32 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+const fs = require('fs');
 
-import { Menu, Sparkles } from "lucide-react";
-import { useState, useEffect } from "react";
-import { Sidebar } from "./components/Sidebar";
-import { EducationalPlan } from "./pages/EducationalPlan";
-import { LessonPlan } from "./pages/LessonPlan";
-import { Circulars } from "./pages/Circulars";
-import { HistoryPage } from "./pages/HistoryPage";
-import { Worksheets } from "./pages/Worksheets";
-import { SettingsModal } from "./components/SettingsModal";
-import { ExerciseSolver } from './pages/ExerciseSolver';
-import { PdfToWord } from './pages/PdfToWord';
+let appContent = fs.readFileSync('src/App.tsx', 'utf8');
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState("khgd");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+// import Menu, Sparkles
+if (!appContent.includes('Menu')) {
+  appContent = appContent.replace('import { useState', 'import { Menu, Sparkles } from "lucide-react";\nimport { useState');
+}
 
-  useEffect(() => {
-    const storedKey = localStorage.getItem("user_gemini_api_key");
-    if (!storedKey) {
-      setIsSettingsOpen(true);
-    }
-  }, []);
+// add isSidebarOpen state
+if (!appContent.includes('isSidebarOpen')) {
+  appContent = appContent.replace('const [isSettingsOpen', 'const [isSidebarOpen, setIsSidebarOpen] = useState(false);\n  const [isSettingsOpen');
+}
 
-  return (
+// Replace return statement
+const returnRegex = /return \([\s\S]*?\);\n}/;
+
+const newReturn = `return (
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
       {/* Mobile overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar Container */}
-      <div className={`fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <div className={\`fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out md:static md:translate-x-0 \${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}\`}>
         <Sidebar 
           activeTab={activeTab} 
           setActiveTab={(tab) => {
@@ -54,7 +42,7 @@ export default function App() {
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden h-screen">
         {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 shrink-0 shadow-sm z-10 relative">
+        <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 shrink-0 shadow-sm z-10 relative">
           <div className="flex items-center gap-2 text-emerald-600">
              <Sparkles className="h-6 w-6" />
              <span className="font-bold text-lg">EduPlan AI</span>
@@ -77,4 +65,9 @@ export default function App() {
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
-}
+}`;
+
+appContent = appContent.replace(returnRegex, newReturn);
+
+fs.writeFileSync('src/App.tsx', appContent);
+console.log('App.tsx updated');

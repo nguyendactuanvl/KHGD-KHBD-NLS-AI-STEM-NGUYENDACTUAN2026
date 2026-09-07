@@ -246,9 +246,9 @@ export function Worksheets() {
   };
 
   return (
-    <div className="flex h-full bg-slate-50">
+    <div className="flex flex-col lg:flex-row h-full bg-slate-50 overflow-hidden">
       {/* Left Sidebar - Settings */}
-      <div className="w-[400px] border-r border-slate-200 bg-white flex flex-col h-full overflow-hidden shrink-0">
+      <div className="w-full lg:w-[400px] lg:border-r border-b lg:border-b-0 border-slate-200 bg-white flex flex-col h-[50vh] lg:h-full overflow-hidden shrink-0">
         <div className="p-4 border-b border-slate-200 bg-slate-50/50">
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-emerald-600" />

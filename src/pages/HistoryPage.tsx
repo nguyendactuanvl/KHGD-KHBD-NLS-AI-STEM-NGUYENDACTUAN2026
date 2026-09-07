@@ -103,9 +103,9 @@ export function HistoryPage() {
   );
 
   return (
-    <div className="flex h-full bg-slate-50">
+    <div className="flex flex-col lg:flex-row h-full bg-slate-50 overflow-hidden">
       {/* Sidebar / List */}
-      <div className="w-1/3 border-r border-slate-200 bg-white flex flex-col h-full overflow-hidden">
+      <div className="w-full lg:w-1/3 lg:border-r border-b lg:border-b-0 border-slate-200 bg-white flex flex-col h-[50vh] lg:h-full overflow-hidden shrink-0">
         <div className="p-4 border-b border-slate-200">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">

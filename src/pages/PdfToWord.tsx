@@ -149,7 +149,7 @@ export function PdfToWord() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 p-4 lg:p-4 lg:p-8">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2 mb-2">
@@ -162,7 +162,7 @@ export function PdfToWord() {
         <div className="max-w-2xl mx-auto">
           {!selectedFile ? (
             <div 
-              className="border-2 border-dashed border-slate-300 rounded-xl p-12 text-center hover:bg-slate-50 transition-colors cursor-pointer"
+              className="border-2 border-dashed border-slate-300 rounded-xl p-6 lg:p-12 text-center hover:bg-slate-50 transition-colors cursor-pointer"
               onDragOver={handleDragOver}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
@@ -184,7 +184,7 @@ export function PdfToWord() {
               </button>
             </div>
           ) : (
-            <div className="text-center w-full border-2 border-slate-200 rounded-xl p-12">
+            <div className="text-center w-full border-2 border-slate-200 rounded-xl p-6 lg:p-12">
               <div className="bg-emerald-100 p-4 rounded-full mb-4 mx-auto w-16 h-16 flex items-center justify-center">
                 <FileText className="w-8 h-8 text-emerald-600" />
               </div>

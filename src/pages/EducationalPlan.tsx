@@ -150,8 +150,8 @@ export function EducationalPlan() {
 
   return (
     <div className="flex-1 bg-slate-50 min-h-screen">
-      <div className="bg-white px-8 py-6 border-b border-slate-200">
-        <div className="flex justify-between items-center">
+      <div className="bg-white px-4 lg:px-8 py-4 lg:py-6 border-b border-slate-200">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="flex-1">
             <h2 className="text-2xl font-bold text-slate-800">Kế hoạch giáo dục</h2>
             <p className="text-slate-500 mt-1">Cập nhật theo Công văn 5512 và QĐ 2422</p>
@@ -223,7 +223,7 @@ export function EducationalPlan() {
         </div>
       </div>
 
-      <div className="p-8">
+      <div className="p-4 lg:p-8">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto" ref={exportRef}>
             {/* We keep a hidden simplified version of the table just for export, or we can use the same */}
