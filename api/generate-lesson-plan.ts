@@ -1,35 +1,45 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+export const maxDuration = 60;
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Chỉ chấp nhận phương thức POST' });
-  }
+  // Tránh lỗi CORS và method
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'Chưa cấu hình GEMINI_API_KEY trên hệ thống' });
+    return res.status(500).json({ error: 'Chưa nhận biến GEMINI_API_KEY trên Vercel' });
   }
 
   try {
-    const { topic, grade, details, customPrompt } = req.body;
-
+    const body = req.body || {};
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+    
+    // Dùng model 1.5 flash chuẩn, tuyệt đối không dùng 2.5
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const prompt = customPrompt || `Bạn là chuyên gia sư phạm. Hãy soạn Kế hoạch bài dạy (giáo án) chuẩn Công văn 5512 cho:
-- Môn học: Toán
-- Lớp: ${grade || 10}
-- Bài học: ${topic || 'Bài học'}
-- Thông tin chi tiết / Yêu cầu cần đạt: ${JSON.stringify(details || '')}
-Nội dung phải đầy đủ các bước: Khởi động, Hình thành kiến thức, Luyện tập, Vận dụng theo CV 5512.`;
+    const prompt = body.customPrompt || body.prompt || `Bạn là giáo viên. Hãy soạn giáo án bài: ${body.topic || 'Mệnh đề'}, môn Toán lớp ${body.grade || 10} theo CV 5512.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    return res.status(200).json({ result: text });
+    // Trả về đầy đủ mọi định dạng tên biến mà Frontend có thể cần
+    return res.status(200).json({
+      success: true,
+      text: text,
+      result: text,
+      plan: text,
+      data: text,
+      content: text
+    });
   } catch (error) {
-    console.error('Lỗi khi gọi Gemini API:', error);
+    console.error('API Error:', error);
     return res.status(500).json({ error: error.message || 'Lỗi xử lý AI' });
   }
 }
