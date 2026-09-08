@@ -7,6 +7,7 @@ export function HomeroomManagement() {
   const [competitionRules, setCompetitionRules] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"list" | "competition">("list");
   
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -47,11 +48,11 @@ export function HomeroomManagement() {
   };
 
   
-  const clearAllStudents = () => {
-    if (confirm("⚠️ CẢNH BÁO: Bạn có chắc chắn muốn xóa TOÀN BỘ danh sách học sinh và điểm thi đua của lớp này không? Hành động này không thể hoàn tác.")) {
-      saveStudents([]);
-      saveCompetitionScores({});
-    }
+  const clearAllStudents = () => { setIsConfirmClearOpen(true); };
+  const executeClearAllStudents = () => {
+    saveStudents([]);
+    saveCompetitionScores({});
+    setIsConfirmClearOpen(false);
   };
 
   const removeStudent = (id: string) => {
@@ -320,7 +321,7 @@ export function HomeroomManagement() {
               <button onClick={addStudent} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-sm font-medium shadow-sm transition-colors">
                 <Plus className="w-4 h-4" /> Thêm HS
               </button>
-              <button onClick={clearAllStudents} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 hover:text-red-700 text-sm font-medium transition-colors" title="Xóa toàn bộ danh sách">
+              <button onClick={(e) => { e.preventDefault(); clearAllStudents(); }} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 hover:text-red-700 text-sm font-medium transition-colors" title="Xóa toàn bộ danh sách">
                 <Trash2 className="w-4 h-4" /> Xóa danh sách
               </button>
               <label className={`flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 text-sm font-medium cursor-pointer transition-colors ${isExtracting ? 'opacity-70 pointer-events-none' : ''}`}>
@@ -555,6 +556,29 @@ export function HomeroomManagement() {
           </div>
         </div>
       )}
+
+      {/* Confirm Clear Modal */}
+      {isConfirmClearOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-2">Cảnh báo xóa dữ liệu</h3>
+              <p className="text-slate-600 text-sm">
+                Bạn có chắc chắn muốn xóa TOÀN BỘ danh sách học sinh của lớp này không? Hành động này không thể hoàn tác.
+              </p>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={() => setIsConfirmClearOpen(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors">
+                Hủy bỏ
+              </button>
+              <button onClick={executeClearAllStudents} className="px-4 py-2 bg-red-600 text-white font-medium hover:bg-red-700 rounded-lg transition-colors">
+                Xóa toàn bộ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

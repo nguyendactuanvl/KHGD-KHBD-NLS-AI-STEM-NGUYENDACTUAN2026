@@ -27,7 +27,7 @@ function getAiClient(req: express.Request) {
 // Helper function to bypass quota limits by using fallback models
 async function generateWithFallback(req: express.Request, payloadOptions: any) {
   const client = getAiClient(req);
-  const models = ["gemini-3.6-flash", "gemini-3.1-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
   
   let lastError: any;
   for (const model of models) {
