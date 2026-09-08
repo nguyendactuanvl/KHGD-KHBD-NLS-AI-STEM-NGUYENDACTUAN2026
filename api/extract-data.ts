@@ -18,7 +18,7 @@ function getAiClient(req: any) {
 
 async function generateWithFallback(req: any, payloadOptions: any) {
   const client = getAiClient(req);
-  const models = ["gemini-3.6-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  const models = ["gemini-3.6-flash", "gemini-3.1-pro-preview"];
   let lastError: any;
   for (const model of models) {
     try {
