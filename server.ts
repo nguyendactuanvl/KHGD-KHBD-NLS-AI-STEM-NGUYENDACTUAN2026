@@ -49,6 +49,8 @@ async function generateWithFallback(req: express.Request, payloadOptions: any) {
   throw lastError;
 }
 
+const sharedExamsStore = new Map();
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -149,7 +151,7 @@ Yêu cầu định dạng và nội dung (dùng cú pháp Markdown):
 1. **Phân chia tiết học**: BẮT BUỘC phải phân bổ rõ ràng tiến trình dạy học thành ${periods || "1"} tiết học. Mỗi tiết phải ghi rõ "Tiết 1: ... (45 phút)", "Tiết 2: ... (45 phút)", v.v... đảm bảo khối lượng nội dung và các hoạt động vừa vặn cho đúng 45 phút/tiết.
 2. **Tuyệt đối KHÔNG sử dụng thẻ HTML \`<br>\` hoặc \`<br/>\`**: Hãy sử dụng dấu xuống dòng chuẩn của Markdown (Enter 2 lần) để ngắt đoạn.
 3. **Tô màu Năng lực số (NLS) và Năng lực AI**: Khi nhắc đến phần mềm, công cụ thiết bị số, Năng lực số hoặc công cụ AI trong bài, BẮT BUỘC phải bọc trong thẻ HTML \`<mark style="background-color: #dbeafe; color: #1d4ed8; font-weight: bold; padding: 2px 4px; border-radius: 4px;">Tên phần mềm / NLS</mark>\` để tô màu xanh nổi bật.
-4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Sử dụng duy nhất dấu \$ cho công thức trong dòng (ví dụ: $a+b=c$) và \$\$ cho công thức riêng (ví dụ: $x^2$). Không dùng các ký tự Unicode mô phỏng công thức.
+4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Sử dụng duy nhất dấu $ cho công thức trong dòng (ví dụ: $a+b=c$) và $$ cho công thức riêng (ví dụ: $x^2$). Không dùng các ký tự Unicode mô phỏng công thức.
 5. **Bảng biểu**: Sử dụng chuẩn bảng Markdown đẹp mắt (Markdown tables) để phân chia rõ ràng Mục tiêu, Nội dung, Sản phẩm, Tổ chức thực hiện.
 6. **I. MỤC TIÊU**: Trình bày rõ ràng Kiến thức, Năng lực số, Năng lực AI, và Yêu cầu STEM. Các mã chỉ báo (như [3.1.NC1a]) phải được giữ nguyên và giải thích ngắn gọn cách đạt được trong bài.
 7. **II. THIẾT BỊ DẠY HỌC VÀ HỌC LIỆU**: Ghi rõ các thiết bị số, phần mềm, công cụ AI cần thiết.
@@ -206,7 +208,7 @@ Yêu cầu định dạng và nội dung (dùng cú pháp Markdown):
 1. **Phân chia tiết học**: BẮT BUỘC dựa vào số tiết trích xuất được để phân bổ rõ ràng tiến trình dạy học. Ví dụ bài có 2 tiết thì phải ghi rõ "Tiết 1: ... (45 phút)", "Tiết 2: ... (45 phút)". Mỗi tiết đảm bảo thời lượng đúng 45 phút.
 2. **Tuyệt đối KHÔNG sử dụng thẻ HTML \`<br>\` hoặc \`<br/>\`**: Hãy sử dụng dấu xuống dòng chuẩn của Markdown (Enter 2 lần) để ngắt đoạn.
 3. **Tô màu Năng lực số (NLS) và Năng lực AI**: Khi nhắc đến phần mềm, công cụ thiết bị số, Năng lực số hoặc công cụ AI trong bài, BẮT BUỘC phải bọc trong thẻ HTML \`<mark style="background-color: #dbeafe; color: #1d4ed8; font-weight: bold; padding: 2px 4px; border-radius: 4px;">Tên phần mềm / NLS</mark>\` để tô màu xanh nổi bật.
-4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Sử dụng duy nhất dấu \$ cho công thức trong dòng (ví dụ: $a+b=c$) và \$\$ cho công thức riêng (ví dụ: $x^2$). Không dùng các ký tự Unicode mô phỏng công thức.
+4. **Toán học và công thức**: Bắt buộc sử dụng chuẩn LaTeX. Sử dụng duy nhất dấu $ cho công thức trong dòng (ví dụ: $a+b=c$) và $$ cho công thức riêng (ví dụ: $x^2$). Không dùng các ký tự Unicode mô phỏng công thức.
 5. **Bảng biểu**: Sử dụng chuẩn bảng Markdown đẹp mắt (Markdown tables) để phân chia rõ ràng Mục tiêu, Nội dung, Sản phẩm, Tổ chức thực hiện.
 6. **I. MỤC TIÊU**: Trình bày rõ ràng Kiến thức, Năng lực số, Năng lực AI, và Yêu cầu STEM. Các mã chỉ báo (như [3.1.NC1a]) phải được giữ nguyên và giải thích ngắn gọn cách đạt được trong bài.
 7. **II. THIẾT BỊ DẠY HỌC VÀ HỌC LIỆU**: Ghi rõ các thiết bị số, phần mềm, công cụ AI cần thiết.
@@ -468,6 +470,254 @@ app.get("/api/circulars", (req, res) => {
   });
 
   // Vite middleware for development
+
+  app.post("/api/extract-data", express.json({limit: '50mb'}), async (req, res) => {
+    try {
+      const { file, type } = req.body;
+      let promptText = "";
+      let responseSchema;
+      
+      if (type === "timetable") {
+        promptText = `Trích xuất Thời khóa biểu từ tài liệu. Hệ thống tiết học: Sáng (tiết 1, 2, 3, 4, 5), Chiều (tiết 6, 7, 8, 9, 10), Tối (tiết Tối).
+Nếu trong tài liệu ghi buổi chiều tiết 1,2,3,4,5 thì tự động chuyển đổi thành tiết 6,7,8,9,10.
+Trả về danh sách các tiết học/lịch công tác.`;
+        responseSchema = {
+          type: Type.OBJECT,
+          properties: {
+            entries: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  day: { type: Type.STRING, description: "Ví dụ: Thứ 2, Thứ 3..." },
+                  period: { type: Type.STRING, description: "Từ 1 đến 10, hoặc 'Tối'" },
+                  content: { type: Type.STRING }
+                },
+                required: ["day", "period", "content"]
+              }
+            }
+          },
+          required: ["entries"]
+        };
+      } else if (type === "student_profiles") {
+        promptText = "Trích xuất danh sách học sinh kèm thông tin liên lạc từ tài liệu đính kèm. Bỏ qua tiêu đề. Lấy họ tên, ngày sinh, số điện thoại học sinh, họ tên phụ huynh, số điện thoại phụ huynh, địa chỉ, ghi chú (nếu có).";
+        responseSchema = {
+          type: Type.OBJECT,
+          properties: {
+            students: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  dob: { type: Type.STRING },
+                  phone: { type: Type.STRING },
+                  parentName: { type: Type.STRING },
+                  parentPhone: { type: Type.STRING },
+                  address: { type: Type.STRING },
+                  notes: { type: Type.STRING }
+                },
+                required: ["name"]
+              }
+            }
+          },
+          required: ["students"]
+        };
+      } else if (type === "students") {
+        promptText = "Trích xuất danh sách họ và tên học sinh từ tài liệu đính kèm. Bỏ qua các tiêu đề, STT, cột điểm, chỉ lấy họ và tên.";
+        responseSchema = {
+          type: Type.OBJECT,
+          properties: {
+            students: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            }
+          },
+          required: ["students"]
+        };
+      } else {
+        throw new Error("Invalid extract type");
+      }
+      
+      const matches = file.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);
+      if (!matches) throw new Error("Invalid file format");
+      
+      const parts = [
+        { text: promptText },
+        {
+          inlineData: {
+            mimeType: matches[1],
+            data: matches[2]
+          }
+        }
+      ];
+      
+      const payloadOptions = {
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json",
+          responseSchema
+        }
+      };
+
+      const response = await generateWithFallback(req, payloadOptions);
+      if (!response || !response.text) throw new Error("No response from AI");
+      
+      let parsed;
+      try {
+        parsed = JSON.parse(response.text);
+      } catch(e) {
+        const cleanJson = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+        parsed = JSON.parse(cleanJson);
+      }
+      
+      res.json(parsed);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: error.message || "Failed to extract data" });
+    }
+  });
+
+  app.post("/api/generate-exam", express.json({limit: '20mb'}), async (req, res) => {
+    try {
+      const { subject, grade, duration, examType, matrix, customPrompt, qCounts, matrixFile, selectedTopics } = req.body;
+      
+      const isMath = subject.toLowerCase().includes('toán');
+      
+      let mathPrompt = "";
+      let total = 20;
+      
+      if (isMath) {
+        total = (qCounts.mc || 0) + (qCounts.tf || 0) + (qCounts.sa || 0) + (qCounts.essay || 0);
+        mathPrompt = `Cấu trúc đề Toán yêu cầu:
+- Trắc nghiệm nhiều lựa chọn (mc): ${qCounts.mc} câu.
+- Trắc nghiệm Đúng/Sai (tf): ${qCounts.tf} câu (Mỗi câu gồm 1 mệnh đề chính và 4 ý a,b,c,d để học sinh chọn đúng/sai).
+- Trắc nghiệm trả lời ngắn (sa): ${qCounts.sa} câu.
+- Tự luận (essay): ${qCounts.essay} câu.
+`;
+        if (selectedTopics && selectedTopics.length > 0) {
+          mathPrompt += `
+Các chủ đề cần tập trung (lấy từ KHGD): ${selectedTopics.join(", ")}
+`;
+        }
+      } else {
+        total = req.body.totalQuestions || 20;
+        mathPrompt = `Cấu trúc: ${total} câu trắc nghiệm nhiều lựa chọn (mc).`;
+      }
+      
+      const promptText = `Hãy tạo một đề kiểm tra môn ${subject} lớp ${grade}.
+Thời gian làm bài: ${duration || 45} phút. Loại bài kiểm tra: ${examType === '15p' ? '15 phút' : examType === '45p' ? '1 tiết' : examType === 'mid' ? 'Giữa kỳ' : 'Cuối kỳ'}.
+
+Yêu cầu cấu trúc:
+${mathPrompt}
+
+${matrix ? "Ma trận người dùng nhập: " + matrix : ""}
+${customPrompt ? "Yêu cầu thêm: " + customPrompt : ""}
+${matrixFile ? "Người dùng có đính kèm một file ma trận (đã đính kèm). Vui lòng bám sát cấu trúc trong file đó." : ""}
+
+Hãy trả về định dạng JSON nghiêm ngặt với cấu trúc như sau:
+{
+  "examName": "Tên đề kiểm tra (ví dụ: Đề kiểm tra giữa kì 1 Toán 9)",
+  "questions": [
+    {
+      "id": 1,
+      "type": "mc", // mc (Trắc nghiệm), tf (Đúng sai), sa (Trả lời ngắn), essay (Tự luận)
+      "content": "Nội dung câu hỏi (chứa cả các ý a, b, c, d nếu là Đúng Sai)",
+      "options": ["Lựa chọn 1", "Lựa chọn 2", "Lựa chọn 3", "Lựa chọn 4"], // Chỉ dùng cho type="mc"
+      "correctOptionIndex": 0, // Chỉ dùng cho type="mc"
+      "correctAnswer": "Giải thích hoặc đáp án cho các loại câu khác", // Dùng cho tf, sa, essay (VD tf: "Đ,S,Đ,S")
+      "level": "Nhận biết"
+    }
+  ]
+}
+Chú ý: Nội dung câu hỏi KHÔNG BAO GỒM các tiền tố như "Câu 1:". Mọi công thức toán học phải bọc trong dấu $ (ví dụ $x^2 + 1$).
+`;
+      
+      const parts = [{ text: promptText }];
+      
+      if (matrixFile) {
+        // matrixFile is data URI: data:image/png;base64,....
+        const matches = matrixFile.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);
+        if (matches) {
+          parts.push({
+            inlineData: {
+              mimeType: matches[1],
+              data: matches[2]
+            }
+          });
+        }
+      }
+      
+      const payloadOptions = {
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          temperature: 0.7,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              examName: { type: Type.STRING },
+              questions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.NUMBER },
+                    type: { type: Type.STRING },
+                    content: { type: Type.STRING },
+                    options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    correctOptionIndex: { type: Type.NUMBER },
+                    correctAnswer: { type: Type.STRING },
+                    level: { type: Type.STRING }
+                  },
+                  required: ["id", "type", "content", "level"]
+                }
+              }
+            },
+            required: ["examName", "questions"]
+          }
+        }
+      };
+
+      const response = await generateWithFallback(req, payloadOptions);
+      if (!response || !response.text) throw new Error("No response from AI");
+      
+      let parsed;
+      try {
+        parsed = JSON.parse(response.text);
+      } catch(e) {
+        const cleanJson = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+        parsed = JSON.parse(cleanJson);
+      }
+      
+      res.json(parsed);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: error.message || "Failed to generate exam" });
+    }
+  });
+
+  app.post("/api/exams/share", express.json({limit: '10mb'}), (req, res) => {
+    try {
+      const { examData, codes } = req.body;
+      const examId = Math.random().toString(36).substring(2, 10);
+      sharedExamsStore.set(examId, { examData, codes, createdAt: Date.now() });
+      res.json({ examId });
+    } catch(e) {
+      res.status(500).json({ error: "Failed to share exam" });
+    }
+  });
+
+  app.get("/api/exams/:id", (req, res) => {
+    const data = sharedExamsStore.get(req.params.id);
+    if (data) {
+      res.json(data);
+    } else {
+      res.status(404).json({ error: "Exam not found" });
+    }
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

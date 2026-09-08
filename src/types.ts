@@ -26,3 +26,16 @@ export interface HistoryItem {
   content: string; // The generated markdown
   createdAt: number;
 }
+
+export interface Student {
+  id: string;
+  name: string;
+  role?: string;
+  isFixed?: boolean;
+  phone?: string;
+  parentName?: string;
+  parentPhone?: string;
+  address?: string;
+  notes?: string;
+  dob?: string;
+}

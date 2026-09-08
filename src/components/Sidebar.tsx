@@ -1,4 +1,4 @@
-import {  BookOpen, Calendar, FileText, Settings, Sparkles, Clock, ClipboardList , FileEdit } from "lucide-react";
+import { Trophy, BookOpen, Calendar, FileText, Settings, Sparkles, Clock, ClipboardList, FileEdit, FileCheck, Users, ShieldCheck, CalendarDays } from "lucide-react";
 import { cn } from "../lib/utils";
 
 interface SidebarProps {
@@ -9,6 +9,11 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab, onOpenSettings }: SidebarProps) {
   const navItems = [
+    { id: "gamification", label: "Thi đua & Gọi tên", icon: Trophy },
+    { id: "classmap", label: "Sơ đồ lớp", icon: Users },
+    { id: "homeroom", label: "Quản lý lớp CN", icon: ShieldCheck },
+    { id: "timetable", label: "TKB & Công việc", icon: CalendarDays },
+    { id: "exam", label: "Tạo & Trộn đề", icon: FileCheck },
     { id: "khgd", label: "Kế hoạch giáo dục", icon: Calendar },
     { id: "khdh", label: "Kế hoạch dạy học", icon: BookOpen },
     { id: "worksheets", label: "Phiếu học tập", icon: ClipboardList },

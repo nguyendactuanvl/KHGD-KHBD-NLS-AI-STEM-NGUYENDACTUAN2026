@@ -14,3 +14,8 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: #94a3b8;
 }
+.inline-markdown p {
+  display: inline;
+  margin: 0;
+  padding: 0;
+}

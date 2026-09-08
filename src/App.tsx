@@ -14,9 +14,18 @@ import { Worksheets } from "./pages/Worksheets";
 import { SettingsModal } from "./components/SettingsModal";
 import { ExerciseSolver } from './pages/ExerciseSolver';
 import { PdfToWord } from './pages/PdfToWord';
+import { ExamGenerator } from './pages/ExamGenerator';
+import { StudentExamView } from './pages/StudentExamView';
+import { ClassMap } from './pages/ClassMap';
+import { HomeroomManagement } from './pages/HomeroomManagement';
+import { WeeklyTimetable } from './pages/WeeklyTimetable';
+import { Gamification } from './pages/Gamification';
+
+
+
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("khgd");
+  const [activeTab, setActiveTab] = useState("gamification");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -27,6 +36,13 @@ export default function App() {
     }
   }, []);
 
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  const studentExamId = urlParams.get('examId');
+  if (studentExamId) {
+    return <StudentExamView examId={studentExamId} />;
+  }
+  
   return (
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
       {/* Mobile overlay */}
@@ -69,6 +85,11 @@ export default function App() {
           {activeTab === "khdh" && <LessonPlan />}
           {activeTab === "worksheets" && <Worksheets />}
           {activeTab === "exercise" && <ExerciseSolver />}
+                              {activeTab === "gamification" && <Gamification />}
+          {activeTab === "classmap" && <ClassMap />}
+          {activeTab === "homeroom" && <HomeroomManagement />}
+          {activeTab === "timetable" && <WeeklyTimetable />}
+          {activeTab === "exam" && <ExamGenerator />}
           {activeTab === "pdf2word" && <PdfToWord />}
           {activeTab === "circulars" && <Circulars />}
           {activeTab === "history" && <HistoryPage />}
