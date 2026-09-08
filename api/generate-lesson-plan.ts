@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     const { topic, grade, details, customPrompt } = req.body;
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
     const prompt = customPrompt || `Bạn là chuyên gia sư phạm. Hãy soạn Kế hoạch bài dạy (giáo án) chuẩn Công văn 5512 cho:
 - Môn học: Toán
