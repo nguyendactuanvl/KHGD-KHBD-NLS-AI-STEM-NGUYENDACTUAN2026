@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+const fs = require('fs');
+
+const code = `import { useState, useEffect } from "react";
 import { Upload, Plus, Save, Trash2, Award, FileText, Loader2, FileImage, Search, Edit3, Download, Printer, Trophy } from "lucide-react";
 import { Student } from "../types";
 
@@ -38,7 +40,7 @@ export function HomeroomManagement() {
   };
 
   const addStudent = () => {
-    const newId = `hs${Date.now()}`;
+    const newId = \\\`hs\${Date.now()}\\\`;
     saveStudents([...students, { id: newId, name: "Học sinh mới", role: "" }]);
   };
 
@@ -46,16 +48,7 @@ export function HomeroomManagement() {
     saveStudents(students.map(s => s.id === id ? { ...s, [field]: value } : s));
   };
 
-  
-  const clearAllStudents = () => {
-    if (confirm("⚠️ CẢNH BÁO: Bạn có chắc chắn muốn xóa TOÀN BỘ danh sách học sinh và điểm thi đua của lớp này không? Hành động này không thể hoàn tác.")) {
-      saveStudents([]);
-      saveCompetitionScores({});
-    }
-  };
-
   const removeStudent = (id: string) => {
-
     saveStudents(students.filter(s => s.id !== id));
   };
 
@@ -81,12 +74,12 @@ export function HomeroomManagement() {
 
   const exportToCSV = () => {
     const ranked = getRankedStudents();
-    let csv = "STT,Họ và tên,Điểm cộng,Điểm trừ,Tổng điểm,Xếp hạng,Ghi chú\n";
+    let csv = "STT,Họ và tên,Điểm cộng,Điểm trừ,Tổng điểm,Xếp hạng,Ghi chú\\n";
     ranked.forEach((st, idx) => {
-      csv += `${idx + 1},"${st.name}",${st.score.plus},${st.score.minus},${st.total},${idx + 1},"${st.score.note}"\n`;
+      csv += \\\`\${idx + 1},"\${st.name}",\${st.score.plus},\${st.score.minus},\${st.total},\${idx + 1},"\${st.score.note}"\\n\\\`;
     });
     
-    const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
@@ -101,7 +94,7 @@ export function HomeroomManagement() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     
-    let html = `
+    let html = \\\`
       <html>
       <head>
         <title>Báo Cáo Thi Đua Lớp</title>
@@ -129,22 +122,22 @@ export function HomeroomManagement() {
             </tr>
           </thead>
           <tbody>
-    `;
+    \\\`;
     
     ranked.forEach((st, idx) => {
-      html += `
+      html += \\\`
         <tr>
-          <td>${idx + 1}</td>
-          <td class="name">${st.name}</td>
-          <td style="color: #16a34a;">+${st.score.plus}</td>
-          <td style="color: #dc2626;">-${st.score.minus}</td>
-          <td style="font-weight: bold;">${st.total}</td>
-          <td class="note">${st.score.note}</td>
+          <td>\${idx + 1}</td>
+          <td class="name">\${st.name}</td>
+          <td style="color: #16a34a;">+\${st.score.plus}</td>
+          <td style="color: #dc2626;">-\${st.score.minus}</td>
+          <td style="font-weight: bold;">\${st.total}</td>
+          <td class="note">\${st.score.note}</td>
         </tr>
-      `;
+      \\\`;
     });
     
-    html += `
+    html += \\\`
           </tbody>
         </table>
         <div style="margin-top: 40px; text-align: right; padding-right: 50px;">
@@ -153,7 +146,7 @@ export function HomeroomManagement() {
         </div>
       </body>
       </html>
-    `;
+    \\\`;
     
     printWindow.document.write(html);
     printWindow.document.close();
@@ -186,7 +179,7 @@ export function HomeroomManagement() {
            
            if (data.students && Array.isArray(data.students)) {
              const newStudents = data.students.map((st: any, i: number) => ({
-               id: `hs_${Date.now()}_${i}`,
+               id: \\\`hs_\${Date.now()}_\${i}\\\`,
                name: st.name || "",
                dob: st.dob || "",
                phone: st.phone || "",
@@ -207,7 +200,7 @@ export function HomeroomManagement() {
              } else {
                 saveStudents(newStudents);
              }
-             alert(`Trích xuất thành công ${data.students.length} hồ sơ học sinh!`);
+             alert(\\\`Trích xuất thành công \${data.students.length} hồ sơ học sinh!\\\`);
            } else {
              alert("Lỗi: Không tìm thấy thông tin học sinh");
            }
@@ -224,7 +217,7 @@ export function HomeroomManagement() {
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+        const lines = text.split(/\\r?\\n/).filter(l => l.trim() !== '');
         
         const newStudents: Student[] = [];
         let startIndex = 0;
@@ -241,7 +234,7 @@ export function HomeroomManagement() {
               
               if (parts[nameIdx]) {
                 newStudents.push({
-                  id: `hs_${Date.now()}_${i}`,
+                  id: \\\`hs_\${Date.now()}_\${i}\\\`,
                   name: parts[nameIdx],
                   dob: parts[nameIdx + 1] || "",
                   phone: parts[nameIdx + 2] || "",
@@ -254,7 +247,7 @@ export function HomeroomManagement() {
            } else {
               if (isNaN(Number(l))) {
                  newStudents.push({
-                    id: `hs_${Date.now()}_${i}`,
+                    id: \\\`hs_\${Date.now()}_\${i}\\\`,
                     name: l.trim(),
                     role: "",
                     isFixed: false
@@ -301,13 +294,13 @@ export function HomeroomManagement() {
       <div className="flex gap-4 mb-6 border-b border-slate-200">
         <button 
           onClick={() => setActiveTab("list")}
-          className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === "list" ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={\\\`pb-3 px-1 border-b-2 font-medium text-sm transition-colors \${activeTab === "list" ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}\\\`}
         >
           Danh sách & Chức vụ
         </button>
         <button 
           onClick={() => setActiveTab("competition")}
-          className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === "competition" ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={\\\`pb-3 px-1 border-b-2 font-medium text-sm transition-colors \${activeTab === "competition" ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}\\\`}
         >
           Quy định & Thi đua
         </button>
@@ -317,13 +310,10 @@ export function HomeroomManagement() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
           <div className="p-4 border-b border-slate-200 flex flex-wrap gap-4 justify-between items-center bg-slate-50">
             <div className="flex flex-wrap gap-3">
-              <button onClick={addStudent} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-sm font-medium shadow-sm transition-colors">
+              <button onClick={addStudent} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-sm font-medium">
                 <Plus className="w-4 h-4" /> Thêm HS
               </button>
-              <button onClick={clearAllStudents} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 hover:text-red-700 text-sm font-medium transition-colors" title="Xóa toàn bộ danh sách">
-                <Trash2 className="w-4 h-4" /> Xóa danh sách
-              </button>
-              <label className={`flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 text-sm font-medium cursor-pointer transition-colors ${isExtracting ? 'opacity-70 pointer-events-none' : ''}`}>
+              <label className={\\\`flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 text-sm font-medium cursor-pointer transition-colors \${isExtracting ? 'opacity-70 pointer-events-none' : ''}\\\`}>
                 {isExtracting ? <Loader2 className="w-4 h-4 animate-spin text-emerald-600" /> : <Upload className="w-4 h-4" />}
                 {isExtracting ? 'Đang trích xuất AI...' : 'Nhập Hồ sơ (Excel/Ảnh/PDF)'}
                 <input type="file" className="hidden" accept=".csv,.txt,image/*,.pdf,.doc,.docx" onChange={handleFileUpload} />
@@ -524,7 +514,7 @@ export function HomeroomManagement() {
                         />
                       </td>
                       <td className="p-3 text-center">
-                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-xs ${st.total > 0 ? 'bg-emerald-100 text-emerald-700' : st.total < 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>
+                        <span className={\\\`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-xs \${st.total > 0 ? 'bg-emerald-100 text-emerald-700' : st.total < 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}\\\`}>
                           {st.total > 0 ? '+' : ''}{st.total}
                         </span>
                       </td>
@@ -558,3 +548,6 @@ export function HomeroomManagement() {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/pages/HomeroomManagement.tsx', code);

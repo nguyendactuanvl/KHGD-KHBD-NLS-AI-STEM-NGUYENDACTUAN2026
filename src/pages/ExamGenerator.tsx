@@ -378,13 +378,13 @@ export function ExamGenerator() {
                     <h2 className="text-xl font-bold text-center mb-6">{examName}</h2>
                     {questions.map((q, idx) => (
                       <div key={idx} className="pb-4 border-b border-slate-100 last:border-0">
-                        <p className="font-medium text-slate-800 mb-3"><span className="font-bold">Câu {idx + 1}:</span> <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} className="inline-markdown">{q.content}</Markdown> <span className="text-xs text-emerald-600 font-normal ml-2">[{q.level}]</span></p>
+                        <p className="font-medium text-slate-800 mb-3"><span className="font-bold">Câu {idx + 1}:</span> <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.content}</Markdown></div> <span className="text-xs text-emerald-600 font-normal ml-2">[{q.level}]</span></p>
                         
                         {q.type === 'mc' && q.options && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-4">
                             {q.options.map((opt, oIdx) => (
                               <div key={oIdx} className={`p-2 rounded-md border ${oIdx === q.correctOptionIndex ? 'bg-emerald-50 border-emerald-200 font-medium' : 'border-transparent'}`}>
-                                {String.fromCharCode(65 + oIdx)}. <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} className="inline-markdown">{opt}</Markdown>
+                                {String.fromCharCode(65 + oIdx)}. <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{opt}</Markdown></div>
                               </div>
                             ))}
                           </div>
@@ -392,7 +392,7 @@ export function ExamGenerator() {
                         
                         {q.type !== 'mc' && q.correctAnswer && (
                           <div className="mt-2 pl-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                            <span className="font-semibold text-emerald-800">Đáp án:</span> <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} className="inline-markdown">{q.correctAnswer}</Markdown>
+                            <span className="font-semibold text-emerald-800">Đáp án:</span> <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.correctAnswer}</Markdown></div>
                           </div>
                         )}
                       </div>
@@ -454,12 +454,12 @@ export function ExamGenerator() {
                             <h3 style={{textAlign:'center', fontSize: '16px', marginBottom: '20px'}}>Mã đề: {exam.code}</h3>
                             {exam.questions.map((q, idx) => (
                               <div key={idx} className="question" style={{marginBottom: '15px'}}>
-                                <div><strong>Câu {idx + 1}:</strong> <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} className="inline-markdown">{q.content}</Markdown></div>
+                                <div><strong>Câu {idx + 1}:</strong> <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.content}</Markdown></div></div>
                                 {q.type === 'mc' && q.options && (
                                   <div className="options" style={{display: 'grid', gridTemplateColumns: '1fr 1fr', marginTop: '5px'}}>
                                     {q.options.map((opt, oIdx) => (
                                       <div key={oIdx} className="option" style={{paddingLeft: '10px'}}>
-                                        {String.fromCharCode(65 + oIdx)}. <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} className="inline-markdown">{opt}</Markdown>
+                                        {String.fromCharCode(65 + oIdx)}. <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{opt}</Markdown></div>
                                       </div>
                                     ))}
                                   </div>
@@ -476,7 +476,7 @@ export function ExamGenerator() {
                             <div className="answers-grid" style={{display: 'flex', flexWrap: 'wrap', marginTop: '10px', gap: '15px'}}>
                               {exam.questions.map((q, idx) => (
                                 <div key={idx} style={{minWidth: '60px'}}>
-                                  <strong>{idx + 1}.</strong> {q.type === 'mc' ? String.fromCharCode(65 + (q.correctOptionIndex || 0)) : <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} className="inline-markdown">{q.correctAnswer || ''}</Markdown>}
+                                  <strong>{idx + 1}.</strong> {q.type === 'mc' ? String.fromCharCode(65 + (q.correctOptionIndex || 0)) : <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.correctAnswer || ''}</Markdown></div>}
                                 </div>
                               ))}
                             </div>

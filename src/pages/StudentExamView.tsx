@@ -124,7 +124,7 @@ export function StudentExamView({ examId }: { examId: string }) {
         {currentExam.questions.map((q: any, idx: number) => (
           <div key={idx} className={`bg-white p-6 rounded-xl shadow-sm border ${isSubmitted && answers[idx] !== q.correctOptionIndex ? 'border-red-200' : isSubmitted ? 'border-emerald-200' : 'border-slate-200'}`}>
             <h3 className="font-medium text-slate-800 mb-4 leading-relaxed">
-              <span className="font-bold">Câu {idx + 1}:</span> <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} className="inline-markdown">{q.content}</Markdown>
+              <span className="font-bold">Câu {idx + 1}:</span> <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.content}</Markdown></div>
             </h3>
             <div className="space-y-3">
               {q.type !== 'mc' && !q.options ? (
@@ -158,7 +158,7 @@ export function StudentExamView({ examId }: { examId: string }) {
                     <div className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 ${isSelected && !isSubmitted ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300'}`}>
                       {String.fromCharCode(65 + oIdx)}
                     </div>
-                    <span className="flex-1"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} className="inline-markdown">{opt}</Markdown></span>
+                    <span className="flex-1"><div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{opt}</Markdown></div></span>
                     {isSubmitted && isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
                     {isSubmitted && isSelected && !isCorrect && <XCircle className="w-5 h-5 text-red-600" />}
                   </button>

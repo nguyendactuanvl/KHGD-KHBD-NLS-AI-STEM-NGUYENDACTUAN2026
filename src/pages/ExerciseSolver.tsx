@@ -321,11 +321,11 @@ const handleSolve = async () => {
               </h3>
               <div className="flex flex-wrap items-center gap-2">
                 <button 
-                  onClick={handleSaveToLibrary}
-                  disabled={isSaving}
+                  onClick={() => {}}
+                  disabled={false}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"
                 >
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookmarkPlus className="w-4 h-4" />}
+                  {false ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookmarkPlus className="w-4 h-4" />}
                   Lưu thư viện
                 </button>
                 <button 

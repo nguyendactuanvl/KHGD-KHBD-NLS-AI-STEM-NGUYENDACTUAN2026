@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Trophy, Star, MinusCircle, Play, Users, Medal, Crown, Filter, History, Loader2, Upload, Plus, Trash2, Edit2, FolderOpen } from "lucide-react";
+import { MessageSquare, X, Send, Trophy, Star, MinusCircle, Play, Users, Medal, Crown, Filter, History, Loader2, Upload, Plus, Trash2, Edit2, FolderOpen, MessageSquare, X, Send } from "lucide-react";
 import { Student } from "../types";
 import confetti from "canvas-confetti";
 
@@ -28,7 +28,15 @@ export function Gamification() {
   const [classes, setClasses] = useState<{id: string, name: string}[]>([{ id: "homeroom", name: "Lớp Chủ nhiệm" }]);
   const [selectedClassId, setSelectedClassId] = useState<string>("homeroom");
   const [isExtractingSt, setIsExtractingSt] = useState(false);
+  
   const [manualName, setManualName] = useState("");
+  
+  // AI Modal state
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
 
 
   // Load data
@@ -57,6 +65,14 @@ export function Gamification() {
       try { setScores(JSON.parse(savedScores)); } catch(e) { setScores([]); }
     } else { setScores([]); }
   }, [selectedClassId]);
+
+  
+  const clearAllStudents = () => {
+    if (confirm("⚠️ CẢNH BÁO: Bạn có chắc chắn muốn xóa TOÀN BỘ danh sách học sinh của lớp này không? Hành động này không thể hoàn tác.")) {
+      saveStudents([]);
+      saveScores(scores.filter(s => !students.some(st => st.id === s.studentId)));
+    }
+  };
 
   const saveStudents = (newSt: Student[]) => {
     setStudents(newSt);

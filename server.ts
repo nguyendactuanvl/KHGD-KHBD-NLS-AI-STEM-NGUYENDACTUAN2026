@@ -539,7 +539,7 @@ Trả về danh sách các tiết học/lịch công tác.`;
         throw new Error("Invalid extract type");
       }
       
-      const matches = file.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);
+      const matches = file.match(/^data:([a-zA-Z0-9\/\+\-\.]+);base64,(.+)$/);
       if (!matches) throw new Error("Invalid file format");
       
       const parts = [
@@ -554,7 +554,7 @@ Trả về danh sách các tiết học/lịch công tác.`;
       
       const payloadOptions = {
         contents: [{ role: "user", parts }],
-        generationConfig: {
+        config: {
           temperature: 0.1,
           responseMimeType: "application/json",
           responseSchema
@@ -634,11 +634,11 @@ Hãy trả về định dạng JSON nghiêm ngặt với cấu trúc như sau:
 Chú ý: Nội dung câu hỏi KHÔNG BAO GỒM các tiền tố như "Câu 1:". Mọi công thức toán học phải bọc trong dấu $ (ví dụ $x^2 + 1$).
 `;
       
-      const parts = [{ text: promptText }];
+      const parts: any[] = [{ text: promptText }];
       
       if (matrixFile) {
         // matrixFile is data URI: data:image/png;base64,....
-        const matches = matrixFile.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);
+        const matches = matrixFile.match(/^data:([a-zA-Z0-9\/\+\-\.]+);base64,(.+)$/);
         if (matches) {
           parts.push({
             inlineData: {
@@ -651,7 +651,7 @@ Chú ý: Nội dung câu hỏi KHÔNG BAO GỒM các tiền tố như "Câu 1:".
       
       const payloadOptions = {
         contents: [{ role: "user", parts }],
-        generationConfig: {
+        config: {
           temperature: 0.7,
           responseMimeType: "application/json",
           responseSchema: {
