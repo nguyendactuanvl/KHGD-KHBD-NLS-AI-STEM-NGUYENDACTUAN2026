@@ -89,7 +89,7 @@ export function HistoryPage() {
     
     const url = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(htmlContent);
     const link = document.createElement('a');
-    link.href = url;
+    link.href = URL.createObjectURL(blob);
     
     const downloadName = `Giao_an_${item.lessonName ? item.lessonName.substring(0,30) : 'bai_hoc'}.doc`;
     link.download = downloadName;

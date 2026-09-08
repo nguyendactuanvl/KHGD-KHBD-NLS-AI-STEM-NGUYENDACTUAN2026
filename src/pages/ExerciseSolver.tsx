@@ -205,7 +205,8 @@ const handleSolve = async () => {
     const footer = "</body></html>";
     const sourceHTML = header + contentHtml + footer;
 
-    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+    const blob = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
+    const source = URL.createObjectURL(blob);
     const fileDownload = document.createElement("a");
     document.body.appendChild(fileDownload);
     fileDownload.href = source;

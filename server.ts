@@ -55,7 +55,7 @@ export const app = express();
 
 
 
-  app.use(express.json({ limit: "50mb" }));
+  app.use(express.json({ limit: "100mb" }));
 
   // API route to generate Educational Plan (KHGD) suggestions
   app.post("/api/generate-plan", async (req, res) => {
@@ -471,7 +471,7 @@ app.get("/api/circulars", (req, res) => {
 
   // Vite middleware for development
 
-  app.post("/api/extract-data", express.json({limit: '50mb'}), async (req, res) => {
+  app.post("/api/extract-data", express.json({limit: '100mb'}), async (req, res) => {
     try {
       const { file, type } = req.body;
       let promptText = "";
@@ -579,31 +579,21 @@ Trả về danh sách các tiết học/lịch công tác.`;
     }
   });
 
-  app.post("/api/generate-exam", express.json({limit: '20mb'}), async (req, res) => {
+  app.post("/api/generate-exam", express.json({limit: '100mb'}), async (req, res) => {
     try {
       const { subject, grade, duration, examType, matrix, customPrompt, qCounts, matrixFile, selectedTopics } = req.body;
       
-      const isMath = subject.toLowerCase().includes('toán');
-      
-      let mathPrompt = "";
-      let total = 20;
-      
-      if (isMath) {
-        total = (qCounts.mc || 0) + (qCounts.tf || 0) + (qCounts.sa || 0) + (qCounts.essay || 0);
-        mathPrompt = `Cấu trúc đề Toán yêu cầu:
-- Trắc nghiệm nhiều lựa chọn (mc): ${qCounts.mc} câu.
-- Trắc nghiệm Đúng/Sai (tf): ${qCounts.tf} câu (Mỗi câu gồm 1 mệnh đề chính và 4 ý a,b,c,d để học sinh chọn đúng/sai).
-- Trắc nghiệm trả lời ngắn (sa): ${qCounts.sa} câu.
-- Tự luận (essay): ${qCounts.essay} câu.
+      let total = (qCounts?.mc || 0) + (qCounts?.tf || 0) + (qCounts?.sa || 0) + (qCounts?.essay || 0);
+      let mathPrompt = `Cấu trúc đề yêu cầu:
+- Trắc nghiệm nhiều lựa chọn (mc): ${qCounts?.mc || 0} câu.
+- Trắc nghiệm Đúng/Sai (tf): ${qCounts?.tf || 0} câu (Mỗi câu gồm 1 mệnh đề chính và 4 ý a,b,c,d để học sinh chọn đúng/sai).
+- Trắc nghiệm trả lời ngắn (sa): ${qCounts?.sa || 0} câu.
+- Tự luận (essay): ${qCounts?.essay || 0} câu.
 `;
-        if (selectedTopics && selectedTopics.length > 0) {
-          mathPrompt += `
+      if (selectedTopics && selectedTopics.length > 0) {
+        mathPrompt += `
 Các chủ đề cần tập trung (lấy từ KHGD): ${selectedTopics.join(", ")}
 `;
-        }
-      } else {
-        total = req.body.totalQuestions || 20;
-        mathPrompt = `Cấu trúc: ${total} câu trắc nghiệm nhiều lựa chọn (mc).`;
       }
       
       const promptText = `Hãy tạo một đề kiểm tra môn ${subject} lớp ${grade}.
@@ -698,7 +688,7 @@ Chú ý: Nội dung câu hỏi KHÔNG BAO GỒM các tiền tố như "Câu 1:".
     }
   });
 
-  app.post("/api/exams/share", express.json({limit: '10mb'}), (req, res) => {
+  app.post("/api/exams/share", express.json({limit: '100mb'}), (req, res) => {
     try {
       const { examData, codes } = req.body;
       const examId = Math.random().toString(36).substring(2, 10);

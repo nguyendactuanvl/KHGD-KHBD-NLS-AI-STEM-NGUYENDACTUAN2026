@@ -238,7 +238,7 @@ export function Worksheets() {
     
     const url = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(htmlContent);
     const link = document.createElement('a');
-    link.href = url;
+    link.href = URL.createObjectURL(blob);
     link.download = `PhieuHocTap_${customLessonName.replace(/\s+/g, '_')}.doc`;
     document.body.appendChild(link);
     link.click();

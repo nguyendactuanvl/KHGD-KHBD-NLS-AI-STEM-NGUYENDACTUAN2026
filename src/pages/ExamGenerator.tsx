@@ -383,8 +383,9 @@ export function ExamGenerator() {
                         {q.type === 'mc' && q.options && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-4">
                             {q.options.map((opt, oIdx) => (
-                              <div key={oIdx} className={`p-2 rounded-md border ${oIdx === q.correctOptionIndex ? 'bg-emerald-50 border-emerald-200 font-medium' : 'border-transparent'}`}>
-                                {String.fromCharCode(65 + oIdx)}. <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{opt}</Markdown></div>
+                              <div key={oIdx} className={`flex items-start gap-1 p-2 rounded-md border ${oIdx === q.correctOptionIndex ? 'bg-emerald-50 border-emerald-200 font-medium' : 'border-transparent'}`}>
+                                <span className="shrink-0 font-medium">{String.fromCharCode(65 + oIdx)}.</span>
+                                <div className="markdown-body inline-markdown flex-1"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{opt}</Markdown></div>
                               </div>
                             ))}
                           </div>
@@ -458,8 +459,9 @@ export function ExamGenerator() {
                                 {q.type === 'mc' && q.options && (
                                   <div className="options" style={{display: 'grid', gridTemplateColumns: '1fr 1fr', marginTop: '5px'}}>
                                     {q.options.map((opt, oIdx) => (
-                                      <div key={oIdx} className="option" style={{paddingLeft: '10px'}}>
-                                        {String.fromCharCode(65 + oIdx)}. <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{opt}</Markdown></div>
+                                      <div key={oIdx} className="option" style={{paddingLeft: '10px', display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
+                                        <span style={{fontWeight: 'bold', flexShrink: 0}}>{String.fromCharCode(65 + oIdx)}.</span>
+                                        <div className="markdown-body inline-markdown" style={{flex: 1}}><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{opt}</Markdown></div>
                                       </div>
                                     ))}
                                   </div>
@@ -476,7 +478,7 @@ export function ExamGenerator() {
                             <div className="answers-grid" style={{display: 'flex', flexWrap: 'wrap', marginTop: '10px', gap: '15px'}}>
                               {exam.questions.map((q, idx) => (
                                 <div key={idx} style={{minWidth: '60px'}}>
-                                  <strong>{idx + 1}.</strong> {q.type === 'mc' ? String.fromCharCode(65 + (q.correctOptionIndex || 0)) : <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.correctAnswer || ''}</Markdown></div>}
+                                  <strong>{idx + 1}.</strong> {q.type === 'mc' ? String.fromCharCode(65 + (q.correctOptionIndex || 0)) : <div className="markdown-body inline-markdown" style={{display: 'inline'}}><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.correctAnswer || ''}</Markdown></div>}
                                 </div>
                               ))}
                             </div>
