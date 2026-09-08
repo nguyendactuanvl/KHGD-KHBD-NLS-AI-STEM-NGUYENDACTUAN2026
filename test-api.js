@@ -1,23 +1,22 @@
-const http = require('http');
+const fetch = require('node-fetch'); // wait, fetch is global in node 18+
 
-const data = JSON.stringify({
-  files: [{ data: "hello", type: "text/plain" }]
-});
-
-const req = http.request({
-  hostname: 'localhost',
-  port: 3000,
-  path: '/api/solve-exercise',
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(data)
-  }
-}, (res) => {
-  let body = '';
-  res.on('data', chunk => body += chunk);
-  res.on('end', () => console.log(body));
-});
-
-req.write(data);
-req.end();
+async function test() {
+  const res = await fetch("http://localhost:3000/api/generate-lesson-plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      lesson: "Test",
+      requirement: "Test",
+      digitalComp: "Test",
+      aiComp: "Test",
+      stem: "Test",
+      grade: "10",
+      subject: "Toán",
+      periods: "1"
+    })
+  });
+  console.log("Status:", res.status);
+  const text = await res.text();
+  console.log("Response:", text.substring(0, 200));
+}
+test();
