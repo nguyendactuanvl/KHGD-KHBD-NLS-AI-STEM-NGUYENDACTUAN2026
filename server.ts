@@ -51,9 +51,9 @@ async function generateWithFallback(req: express.Request, payloadOptions: any) {
 
 const sharedExamsStore = new Map();
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
+
+
 
   app.use(express.json({ limit: "50mb" }));
 
@@ -718,23 +718,29 @@ Chú ý: Nội dung câu hỏi KHÔNG BAO GỒM các tiền tố như "Câu 1:".
     }
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*all", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+  if (!process.env.VERCEL) { const PORT = 3000;
+  
+    if (process.env.NODE_ENV !== "production") {
+      import("vi" + "te").then(async ({ createServer: createViteServer }) => {
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: "spa",
+        });
+        app.use(vite.middlewares);
+        app.listen(PORT, "0.0.0.0", () => {
+          console.log(`Server running on port ${PORT}`);
+        });
+      });
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*all", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server running on port ${PORT}`);
+      });
+    }
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}
-
-startServer();
+export default app;
