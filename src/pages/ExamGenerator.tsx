@@ -378,7 +378,7 @@ export function ExamGenerator() {
                     <h2 className="text-xl font-bold text-center mb-6">{examName}</h2>
                     {questions.map((q, idx) => (
                       <div key={idx} className="pb-4 border-b border-slate-100 last:border-0">
-                        <p className="font-medium text-slate-800 mb-3"><span className="font-bold">Câu {idx + 1}:</span> <div className="markdown-body"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.content}</Markdown></div> <span className="text-xs text-emerald-600 font-normal ml-2">[{q.level}]</span></p>
+                        <div className="font-medium text-slate-800 mb-3 flex items-start gap-2"><span className="font-bold whitespace-nowrap mt-1">Câu {idx + 1}:</span> <div className="markdown-body flex-1"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.content}</Markdown></div> <span className="text-xs text-emerald-600 font-normal mt-1 shrink-0">[{q.level}]</span></div>
                         
                         {q.type === 'mc' && q.options && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-4">
