@@ -54,10 +54,12 @@ export default async function handler(req: any, res: any) {
   }
   
     try {
-      const { lesson, subject, files } = req.body;
+      const { lesson, subject, files, textbook } = req.body;
+      const textbookName = textbook || "Kết nối tri thức với cuộc sống";
       
       const prompt = `Bạn là một giáo viên xuất sắc và chuyên gia giáo dục. Tôi đã tải lên một tài liệu Kế hoạch giáo dục (KHGD).
 Dựa vào các tài liệu được cung cấp (Sách, Văn bản, KHDH...), hãy soạn chi tiết một Kế hoạch bài dạy (Giáo án) môn ${subject || "chung"} theo chuẩn Công văn 5512/BGDĐT-GDTrH cho bài học: "${lesson}".
+Đặc biệt lưu ý: Vui lòng sử dụng và bám sát nội dung, thuật ngữ, tiến trình của bộ sách giáo khoa: "${textbookName}".
 Trích xuất các thông tin về:
 - Số tiết (phân bổ thời gian cho bài học này)
 - Yêu cầu cần đạt

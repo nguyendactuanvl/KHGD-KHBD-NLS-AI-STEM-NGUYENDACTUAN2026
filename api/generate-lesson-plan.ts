@@ -24,9 +24,12 @@ export default async function handler(req, res) {
     const digitalCompetence = body.digitalCompetence || '1.1.NC1a: Kiểm tra tính logic của mệnh đề.';
     const aiCompetence = body.aiCompetence || '10.C2.3; 10.C3.2: Phân tích logic và kiểm tra mệnh đề qua ChatGPT/Gemini.';
     const stem = body.stem || 'Có';
+    const textbook = body.textbook || 'Kết nối tri thức với cuộc sống';
 
     // Xây dựng System Prompt chi tiết theo đúng cấu trúc CV 5512 & GDPT 2018
-    const promptText = body.customPrompt || `Bạn là chuyên gia sư phạm Toán học chương trình GDPT 2018. Hãy soạn một Kế hoạch bài dạy (Giáo án) chi tiết, chỉn chu, đúng chuẩn Công văn 5512/BGDĐT-GDTrH với các thông tin sau:
+    const promptText = body.customPrompt || `Bạn là chuyên gia sư phạm Toán học chương trình GDPT 2018. Hãy soạn một Kế hoạch bài dạy (Giáo án) chi tiết, chỉn chu, đúng chuẩn Công văn 5512/BGDĐT-GDTrH.
+Đặc biệt lưu ý: Vui lòng sử dụng và bám sát nội dung, thuật ngữ, tiến trình của bộ sách giáo khoa: "${textbook}".
+Các thông tin cốt lõi của bài học:
 - Tên bài: ${topic}
 - Cấp học: ${grade}
 - Thời lượng: ${periods} tiết

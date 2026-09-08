@@ -8,6 +8,8 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { saveToHistory } from '../lib/history';
+import { TextbookManager } from '../components/TextbookManager';
+import { Textbook } from '../lib/textbooks';
 import { printElement } from '../lib/print';
 
 
@@ -25,6 +27,7 @@ export function LessonPlan() {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTextbook, setSelectedTextbook] = useState<Textbook | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -104,13 +107,15 @@ export function LessonPlan() {
           stem: selectedLesson!.stem,
           grade: selectedLesson!.grade,
           periods: selectedLesson!.periods,
-          subject: subject
+          subject: subject,
+          textbook: selectedTextbook?.name || "Kết nối tri thức với cuộc sống"
         };
       } else {
         endpoint = '/api/generate-lesson-plan-file';
         payload = {
           lesson: customLessonName,
           subject: subject,
+          textbook: selectedTextbook?.name || "Kết nối tri thức với cuộc sống",
           files: uploadedFiles
         };
       }
@@ -152,6 +157,7 @@ export function LessonPlan() {
         type: "KHBD",
         grade: activeTab === "system" && selectedLesson ? selectedLesson.grade : 0,
         subject: subject,
+          textbook: selectedTextbook?.name || "Kết nối tri thức với cuộc sống",
         lessonName: activeTab === "system" && selectedLesson ? selectedLesson.lesson : customLessonName,
         content: data.result
       });
@@ -315,6 +321,8 @@ export function LessonPlan() {
           Soạn Kế hoạch Bài dạy
         </h2>
         
+        <TextbookManager onSelect={setSelectedTextbook} selectedId={selectedTextbook?.id || ""} />
+
         <div className="flex bg-slate-100 p-1 rounded-lg">
           <button 
             className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'system' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
