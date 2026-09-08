@@ -19,34 +19,26 @@ export default async function handler(req, res) {
     const grade = body.grade || '9';
     const duration = body.duration || '45';
     const mcqCount = Number(body.multipleChoiceCount ?? body.mcq ?? 20);
-    const tfCount = Number(body.trueFalseCount ?? body.tf ?? 0);
-    const shortCount = Number(body.shortAnswerCount ?? body.short ?? 0);
-    const essayCount = Number(body.essayCount ?? body.essay ?? 0);
-    const matrix = body.matrix || body.rawMatrix || 'Chương trình môn Toán THCS/THPT hiện hành';
+    const matrix = body.matrix || body.rawMatrix || 'Chương trình chuẩn GDPT 2018';
 
-    const promptText = `Bạn là chuyên gia ra đề thi chuẩn GDPT 2018 môn ${subject} Lớp ${grade}.
-Hãy tạo đề kiểm tra thời gian ${duration} phút theo cấu trúc:
-- Trắc nghiệm 4 lựa chọn: ${mcqCount} câu
-- Trắc nghiệm Đúng/Sai: ${tfCount} câu
-- Trả lời ngắn: ${shortCount} câu
-- Tự luận: ${essayCount} câu
-Khung ma trận: ${matrix}
+    const promptText = `Bạn là chuyên gia ra đề thi môn ${subject} Lớp ${grade}.
+Hãy tạo đề trắc nghiệm gồm ${mcqCount} câu hỏi chuẩn 4 lựa chọn A, B, C, D theo ma trận: ${matrix}.
 
-BẮT BUỘC TRẢ VỀ DỮ LIỆU ĐÚNG ĐỊNH DẠNG JSON DUY NHẤT (không dùng markdown \`\`\`json bọc bên ngoài), cấu trúc như sau:
+BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
 {
   "title": "ĐỀ KIỂM TRA MÔN ${subject.toUpperCase()} LỚP ${grade}",
-  "duration": "${duration} phút",
+  "duration": "${duration}",
   "questions": [
     {
       "id": 1,
-      "type": "mcq",
-      "question": "Nội dung câu hỏi...",
+      "number": 1,
+      "content": "Nội dung câu hỏi 1 ở đây?",
       "options": ["A. Đáp án 1", "B. Đáp án 2", "C. Đáp án 3", "D. Đáp án 4"],
+      "correct": "A",
       "answer": "A",
-      "explanation": "Lời giải chi tiết..."
+      "explanation": "Lời giải chi tiết câu 1..."
     }
-  ],
-  "rawText": "Toàn văn đề thi và đáp án để in ấn"
+  ]
 }`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
@@ -70,21 +62,46 @@ BẮT BUỘC TRẢ VỀ DỮ LIỆU ĐÚNG ĐỊNH DẠNG JSON DUY NHẤT (khôn
     try {
       parsedData = JSON.parse(rawOutput);
     } catch {
-      parsedData = { questions: [], rawText: rawOutput };
+      parsedData = { questions: [] };
     }
 
-    const questionsList = parsedData.questions || [];
-    const fullText = parsedData.rawText || rawOutput;
+    const rawQuestions = Array.isArray(parsedData.questions) ? parsedData.questions : (Array.isArray(parsedData) ? parsedData : []);
 
-    // Trả về cả mảng questions và text để mọi hàm ở frontend đều nhận được
+    // Ánh xạ đồng bộ TẤT CẢ các biến để dù Frontend gọi tên nào cũng có dữ liệu
+    const formattedQuestions = rawQuestions.map((q, idx) => {
+      const questionText = q.content || q.question || q.text || q.title || `Câu hỏi số ${idx + 1}`;
+      const choices = q.options || q.choices || q.answers || [];
+      const rightAns = q.correct || q.answer || q.correctAnswer || 'A';
+      const explain = q.explanation || q.explain || q.solution || '';
+
+      return {
+        id: q.id || idx + 1,
+        number: idx + 1,
+        // Các biến chứa đề bài:
+        content: questionText,
+        question: questionText,
+        text: questionText,
+        title: questionText,
+        // Các biến chứa đáp án trắc nghiệm:
+        options: choices,
+        choices: choices,
+        answers: choices,
+        // Các biến chứa đáp án đúng:
+        correct: rightAns,
+        answer: rightAns,
+        correctAnswer: rightAns,
+        // Lời giải:
+        explanation: explain,
+        explain: explain
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: parsedData,
-      questions: questionsList,
-      exam: parsedData,
-      result: parsedData,
-      text: fullText,
-      rawText: fullText
+      data: { ...parsedData, questions: formattedQuestions },
+      questions: formattedQuestions,
+      exam: { ...parsedData, questions: formattedQuestions },
+      result: { ...parsedData, questions: formattedQuestions }
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
