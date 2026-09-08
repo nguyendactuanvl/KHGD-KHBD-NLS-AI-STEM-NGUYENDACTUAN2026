@@ -1,9 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
 export const maxDuration = 60;
 
 export default async function handler(req, res) {
-  // Tránh lỗi CORS và method
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -13,33 +10,40 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'Chưa nhận biến GEMINI_API_KEY trên Vercel' });
+    return res.status(500).json({ error: 'Thiếu biến GEMINI_API_KEY trên Vercel' });
   }
 
   try {
     const body = req.body || {};
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // Dùng model 1.5 flash chuẩn, tuyệt đối không dùng 2.5
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const promptText = body.customPrompt || body.prompt || `Hãy soạn Kế hoạch bài dạy môn Toán lớp ${body.grade || 10}, bài ${body.topic || 'Mệnh đề'} chuẩn Công văn 5512.`;
 
-    const prompt = body.customPrompt || body.prompt || `Bạn là giáo viên. Hãy soạn giáo án bài: ${body.topic || 'Mệnh đề'}, môn Toán lớp ${body.grade || 10} theo CV 5512.`;
+    // Gọi trực tiếp model gemini-3.6-flash theo yêu cầu mới nhất từ Google API
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: promptText }] }]
+      })
+    });
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const data = await response.json();
 
-    // Trả về đầy đủ mọi định dạng tên biến mà Frontend có thể cần
+    if (!response.ok) {
+      console.error('Lỗi từ Google API:', JSON.stringify(data));
+      return res.status(500).json({ error: data.error?.message || 'Lỗi từ Google API' });
+    }
+
+    const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
     return res.status(200).json({
       success: true,
-      text: text,
-      result: text,
-      plan: text,
-      data: text,
-      content: text
+      result: outputText,
+      text: outputText,
+      plan: outputText,
+      content: outputText
     });
-  } catch (error) {
-    console.error('API Error:', error);
-    return res.status(500).json({ error: error.message || 'Lỗi xử lý AI' });
+  } catch (err) {
+    console.error('Lỗi server:', err);
+    return res.status(500).json({ error: err.message });
   }
 }
