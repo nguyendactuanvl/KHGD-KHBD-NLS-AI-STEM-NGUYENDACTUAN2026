@@ -15,67 +15,76 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    
-    // Thu thập các thông số từ giao diện Tạo đề
     const subject = body.subject || 'Toán';
-    const grade = body.grade || 'Lớp 9';
+    const grade = body.grade || '9';
     const duration = body.duration || '45';
-    const examType = body.examType || '15 phút';
-    const multipleChoiceCount = body.multipleChoiceCount ?? body.mcq ?? 20;
-    const trueFalseCount = body.trueFalseCount ?? body.tf ?? 0;
-    const shortAnswerCount = body.shortAnswerCount ?? body.short ?? 0;
-    const essayCount = body.essayCount ?? body.essay ?? 0;
-    const matrix = body.matrix || body.rawMatrix || 'Theo chương trình chuẩn GDPT 2018';
-    const extraRequirements = body.extraRequirements || body.requirements || '';
+    const mcqCount = Number(body.multipleChoiceCount ?? body.mcq ?? 20);
+    const tfCount = Number(body.trueFalseCount ?? body.tf ?? 0);
+    const shortCount = Number(body.shortAnswerCount ?? body.short ?? 0);
+    const essayCount = Number(body.essayCount ?? body.essay ?? 0);
+    const matrix = body.matrix || body.rawMatrix || 'Chương trình môn Toán THCS/THPT hiện hành';
 
-    // Xây dựng System Prompt chi tiết chuẩn GDPT 2018
-    const promptText = body.customPrompt || `Bạn là chuyên gia khảo thí và xây dựng đề kiểm tra môn ${subject} cấp THCS/THPT.
-Hãy tạo một Đề kiểm tra gốc kèm Bảng đáp án và Hướng dẫn chấm chi tiết với các yêu cầu sau:
-- Môn: ${subject} - ${grade}
-- Thời gian làm bài: ${duration} phút (Hình thức: ${examType})
-- Cấu trúc số lượng câu hỏi:
-  + Trắc nghiệm nhiều lựa chọn (4 phương án A, B, C, D): ${multipleChoiceCount} câu
-  + Trắc nghiệm Đúng/Sai: ${trueFalseCount} câu
-  + Trắc nghiệm trả lời ngắn: ${shortAnswerCount} câu
-  + Tự luận: ${essayCount} câu
-- Khung Ma trận / Nội dung kiến thức: ${matrix}
-- Yêu cầu bổ sung: ${extraRequirements}
+    const promptText = `Bạn là chuyên gia ra đề thi chuẩn GDPT 2018 môn ${subject} Lớp ${grade}.
+Hãy tạo đề kiểm tra thời gian ${duration} phút theo cấu trúc:
+- Trắc nghiệm 4 lựa chọn: ${mcqCount} câu
+- Trắc nghiệm Đúng/Sai: ${tfCount} câu
+- Trả lời ngắn: ${shortCount} câu
+- Tự luận: ${essayCount} câu
+Khung ma trận: ${matrix}
 
-YÊU CẦU ĐỊNH DẠNG ĐỀ THI:
-1. TIÊU ĐỀ: Ghi rõ Tên trường/kỳ thi, Môn, Lớp, Thời gian làm bài.
-2. PHẦN I: CÂU HỎI TRẮC NGHIỆM (nếu có, ghi rõ từng câu: Câu 1, Câu 2... với 4 đáp án A. B. C. D. xuống dòng rõ ràng).
-3. PHẦN II: CÂU HỎI ĐÚNG/SAI (nếu có, mỗi câu gồm 4 ý a, b, c, d).
-4. PHẦN III: CÂU HỎI TRẢ LỜI NGẮN (nếu có).
-5. PHẦN IV: TỰ LUẬN (nếu có).
-6. BẢNG ĐÁP ÁN VÀ LỜI GIẢI CHI TIẾT: Trình bày bảng đáp án nhanh và hướng dẫn giải từng câu.
+BẮT BUỘC TRẢ VỀ DỮ LIỆU ĐÚNG ĐỊNH DẠNG JSON DUY NHẤT (không dùng markdown \`\`\`json bọc bên ngoài), cấu trúc như sau:
+{
+  "title": "ĐỀ KIỂM TRA MÔN ${subject.toUpperCase()} LỚP ${grade}",
+  "duration": "${duration} phút",
+  "questions": [
+    {
+      "id": 1,
+      "type": "mcq",
+      "question": "Nội dung câu hỏi...",
+      "options": ["A. Đáp án 1", "B. Đáp án 2", "C. Đáp án 3", "D. Đáp án 4"],
+      "answer": "A",
+      "explanation": "Lời giải chi tiết..."
+    }
+  ],
+  "rawText": "Toàn văn đề thi và đáp án để in ấn"
+}`;
 
-Toàn bộ công thức Toán phải dùng định dạng LaTeX chuẩn ($...$ hoặc $$...$$).`;
-
-    // Gọi trực tiếp model gemini-3.6-flash chuẩn mới
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }]
+        contents: [{ parts: [{ text: promptText }] }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
       })
     });
 
     const data = await response.json();
-
     if (!response.ok) {
-      return res.status(500).json({ error: data.error?.message || 'Lỗi từ Google API' });
+      return res.status(500).json({ error: data.error?.message || 'Lỗi Google API' });
     }
 
-    const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    let parsedData = {};
+    try {
+      parsedData = JSON.parse(rawOutput);
+    } catch {
+      parsedData = { questions: [], rawText: rawOutput };
+    }
 
-    // Trả về đầy đủ mọi thuộc tính dữ liệu mà Frontend có thể cần
+    const questionsList = parsedData.questions || [];
+    const fullText = parsedData.rawText || rawOutput;
+
+    // Trả về cả mảng questions và text để mọi hàm ở frontend đều nhận được
     return res.status(200).json({
       success: true,
-      result: outputText,
-      exam: outputText,
-      data: outputText,
-      text: outputText,
-      content: outputText
+      data: parsedData,
+      questions: questionsList,
+      exam: parsedData,
+      result: parsedData,
+      text: fullText,
+      rawText: fullText
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
