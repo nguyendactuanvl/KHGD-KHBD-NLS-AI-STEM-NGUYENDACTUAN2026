@@ -35,6 +35,33 @@ export function WeeklyTimetable() {
     "Thứ 6-5": "Sinh hoạt lớp"
   });
 
+  
+  useEffect(() => {
+    const savedTimetable = localStorage.getItem("timetable_data");
+    if (savedTimetable) {
+      try {
+        setTimetable(JSON.parse(savedTimetable));
+      } catch(e) {}
+    }
+
+    const savedTodos = localStorage.getItem("timetable_todos");
+    if (savedTodos) {
+      try {
+        setTodos(JSON.parse(savedTodos));
+      } catch(e) {}
+    }
+  }, []);
+
+  const saveTimetable = (newTimetable: Record<string, string>) => {
+    setTimetable(newTimetable);
+    localStorage.setItem("timetable_data", JSON.stringify(newTimetable));
+  };
+
+  const saveTodos = (newTodos: {id: number, text: string, done: boolean}[]) => {
+    setTodos(newTodos);
+    localStorage.setItem("timetable_todos", JSON.stringify(newTodos));
+  };
+
   const addTodo = () => {
     if (!newTodo.trim()) return;
     saveTodos([{ id: Date.now(), text: newTodo, done: false }, ...todos]);
@@ -77,13 +104,13 @@ export function WeeklyTimetable() {
              newTimetable[`${entry.day}-${periodId}`] = entry.content;
           });
           saveTimetable(newTimetable);
-          alert("Trích xuất TKB thành công!");
+          console.log("Trích xuất TKB thành công!");
         } else {
-          alert("Lỗi: Không tìm thấy dữ liệu TKB");
+          console.error("Lỗi: Không tìm thấy dữ liệu TKB");
         }
       } catch (err) {
         console.error(err);
-        alert("Có lỗi xảy ra khi trích xuất tài liệu. Vui lòng kiểm tra API Key.");
+        console.error("Có lỗi xảy ra khi trích xuất tài liệu.");
       } finally {
         setIsExtracting(false);
         e.target.value = '';
@@ -120,11 +147,10 @@ export function WeeklyTimetable() {
             </h3>
             <button
               onClick={() => {
-                if (window.confirm("Bạn có chắc chắn muốn xóa trắng Thời khóa biểu?")) {
-                  saveTimetable({});
-                }
+                saveTimetable({});
               }}
               className="text-xs flex items-center gap-1 px-2 py-1 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 rounded-md transition-colors font-medium"
+              title="Xóa trắng Thời khóa biểu"
             >
               <Trash2 className="w-3 h-3" /> Xóa TKB
             </button>
@@ -174,11 +200,10 @@ export function WeeklyTimetable() {
             </h3>
             <button
               onClick={() => {
-                if (window.confirm("Bạn có chắc chắn muốn xóa tất cả công việc?")) {
-                  saveTodos([]);
-                }
+                saveTodos([]);
               }}
               className="text-xs flex items-center gap-1 px-2 py-1 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 rounded-md transition-colors font-medium"
+              title="Xóa tất cả công việc"
             >
               <Trash2 className="w-3 h-3" /> Xóa việc
             </button>
