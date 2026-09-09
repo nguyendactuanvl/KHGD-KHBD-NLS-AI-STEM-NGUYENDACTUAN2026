@@ -31,6 +31,29 @@ export function Gamification() {
   
   const [manualName, setManualName] = useState("");
   
+  // Dialog state
+  const [dialog, setDialog] = useState<{
+    isOpen: boolean;
+    type: 'alert' | 'confirm' | 'prompt' | 'confirm_upload';
+    title: string;
+    message: string;
+    defaultValue?: string;
+    onConfirm?: (val?: string) => void;
+    onCancel?: () => void;
+  } | null>(null);
+
+  const showDialog = (type: 'alert'|'confirm'|'prompt'|'confirm_upload', message: string, onConfirm?: (val?: string) => void, onCancel?: () => void, defaultValue = "") => {
+    setDialog({
+      isOpen: true,
+      type,
+      title: "EduPlan AI cho biết:",
+      message,
+      defaultValue,
+      onConfirm,
+      onCancel
+    });
+  };
+
   // AI Modal state
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -87,28 +110,29 @@ export function Gamification() {
   };
   
   const addClass = () => {
-    const name = prompt("Nhập tên lớp (VD: 10A1, 10A2...):");
-    if (!name) return;
-    const newClass = { id: `cls_${Date.now()}`, name };
-    const newClasses = [...classes, newClass];
-    setClasses(newClasses);
-    localStorage.setItem("gvbm_classes", JSON.stringify(newClasses));
-    setSelectedClassId(newClass.id);
+    showDialog('prompt', 'Nhập tên lớp (VD: 10A1, 10A2...):', (name) => {
+      if (!name) return;
+      const newClass = { id: `cls_${Date.now()}`, name };
+      const newClasses = [...classes, newClass];
+      setClasses(newClasses);
+      localStorage.setItem("gvbm_classes", JSON.stringify(newClasses));
+      setSelectedClassId(newClass.id);
+    });
   };
   
   const removeClass = (id: string) => {
     if (id === "homeroom") {
-      alert("Không thể xóa Lớp Chủ nhiệm mặc định");
+      showDialog('alert', "Không thể xóa Lớp Chủ nhiệm mặc định");
       return;
     }
-    if (confirm("Bạn có chắc chắn muốn xóa lớp này và toàn bộ điểm số của học sinh lớp này?")) {
+    showDialog('confirm', "Bạn có chắc chắn muốn xóa lớp này và toàn bộ điểm số của học sinh lớp này?", () => {
       const newClasses = classes.filter(c => c.id !== id);
       setClasses(newClasses);
       localStorage.setItem("gvbm_classes", JSON.stringify(newClasses));
       localStorage.removeItem(`gvbm_students_${id}`);
       localStorage.removeItem(`gvbm_scores_${id}`);
       if (selectedClassId === id) setSelectedClassId("homeroom");
-    }
+    });
   };
 
   const addManualStudent = () => {
@@ -151,21 +175,26 @@ export function Gamification() {
           }));
           
           if (students.length > 0) {
-            if (confirm("Lớp này đã có danh sách học sinh. Bạn có muốn ghi đè danh sách mới (Xóa cũ) không? Chọn OK để XÓA cũ và THAY MỚI, Cancel để THÊM NỐI TIẾP.")) {
-               saveStudents(newStudents);
-            } else {
-               saveStudents([...students, ...newStudents]);
-            }
+            showDialog('confirm_upload', "Lớp này đã có danh sách. Ghi đè (Xóa cũ) hay Thêm nối tiếp?", 
+              () => {
+                 saveStudents(newStudents);
+                 showDialog('alert', `Trích xuất thành công ${data.students.length} học sinh!`);
+              }, 
+              () => {
+                 saveStudents([...students, ...newStudents]);
+                 showDialog('alert', `Trích xuất thành công ${data.students.length} học sinh!`);
+              }
+            );
           } else {
              saveStudents(newStudents);
+             showDialog('alert', `Trích xuất thành công ${data.students.length} học sinh!`);
           }
-          alert(`Trích xuất thành công ${data.students.length} học sinh!`);
         } else {
-          alert("Lỗi: Không tìm thấy tên học sinh");
+          showDialog('alert', "Lỗi: Không tìm thấy tên học sinh");
         }
       } catch (err) {
         console.error(err);
-        alert("Có lỗi xảy ra khi trích xuất. Vui lòng kiểm tra API Key.");
+        showDialog('alert', "Có lỗi xảy ra khi trích xuất. Vui lòng kiểm tra API Key.");
       } finally {
         setIsExtractingSt(false);
         e.target.value = '';
@@ -728,6 +757,61 @@ export function Gamification() {
         </div>
       )}
 
+
+
+      {/* Custom Dialog */}
+      {dialog?.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-2">{dialog.title}</h3>
+              <p className="text-slate-600 text-sm mb-4">{dialog.message}</p>
+              {dialog.type === 'prompt' && (
+                <input
+                  type="text"
+                  autoFocus
+                  className="w-full border border-slate-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  defaultValue={dialog.defaultValue}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      dialog.onConfirm?.((e.target as HTMLInputElement).value);
+                      setDialog(null);
+                    }
+                  }}
+                  id="dialog-prompt-input"
+                />
+              )}
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              {(dialog.type === 'confirm' || dialog.type === 'prompt' || dialog.type === 'confirm_upload') && (
+                <button
+                  onClick={() => {
+                    dialog.onCancel?.();
+                    setDialog(null);
+                  }}
+                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors"
+                >
+                  {dialog.type === 'confirm_upload' ? 'Thêm nối tiếp' : 'Hủy bỏ'}
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (dialog.type === 'prompt') {
+                    const val = (document.getElementById('dialog-prompt-input') as HTMLInputElement)?.value;
+                    dialog.onConfirm?.(val);
+                  } else {
+                    dialog.onConfirm?.();
+                  }
+                  setDialog(null);
+                }}
+                className={`px-4 py-2 font-medium rounded-lg transition-colors ${dialog.type === 'confirm_upload' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+              >
+                {dialog.type === 'confirm_upload' ? 'Ghi đè (Xóa cũ)' : 'Đồng ý'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirm Clear Modal */}
       {isConfirmClearOpen && (
