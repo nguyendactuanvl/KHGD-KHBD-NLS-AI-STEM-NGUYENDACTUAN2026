@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, Plus, Upload, CheckSquare, Trash2, Loader2, FileImage, Moon } from "lucide-react";
 
 export function WeeklyTimetable() {
@@ -37,16 +37,16 @@ export function WeeklyTimetable() {
 
   const addTodo = () => {
     if (!newTodo.trim()) return;
-    setTodos([{ id: Date.now(), text: newTodo, done: false }, ...todos]);
+    saveTodos([{ id: Date.now(), text: newTodo, done: false }, ...todos]);
     setNewTodo("");
   };
 
   const toggleTodo = (id: number) => {
-    setTodos(todos.map(t => t.id === id ? { ...t, done: !t.done } : t));
+    saveTodos(todos.map(t => t.id === id ? { ...t, done: !t.done } : t));
   };
   
   const removeTodo = (id: number) => {
-    setTodos(todos.filter(t => t.id !== id));
+    saveTodos(todos.filter(t => t.id !== id));
   };
 
   
@@ -76,7 +76,7 @@ export function WeeklyTimetable() {
              const periodId = entry.period.toString();
              newTimetable[`${entry.day}-${periodId}`] = entry.content;
           });
-          setTimetable(newTimetable);
+          saveTimetable(newTimetable);
           alert("Trích xuất TKB thành công!");
         } else {
           alert("Lỗi: Không tìm thấy dữ liệu TKB");
@@ -93,7 +93,7 @@ export function WeeklyTimetable() {
   };
 
   const updateTimetable = (day: string, period: number, val: string) => {
-    setTimetable({ ...timetable, [`${day}-${period}`]: val });
+    saveTimetable({ ...timetable, [`${day}-${period}`]: val });
   };
 
   return (
@@ -114,11 +114,23 @@ export function WeeklyTimetable() {
         
         {/* Timetable */}
         <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col p-4">
-          <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-emerald-600" /> Thời khóa biểu giảng dạy
-          </h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-emerald-600" /> Thời khóa biểu giảng dạy
+            </h3>
+            <button
+              onClick={() => {
+                if (window.confirm("Bạn có chắc chắn muốn xóa trắng Thời khóa biểu?")) {
+                  saveTimetable({});
+                }
+              }}
+              className="text-xs flex items-center gap-1 px-2 py-1 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 rounded-md transition-colors font-medium"
+            >
+              <Trash2 className="w-3 h-3" /> Xóa TKB
+            </button>
+          </div>
           <div className="overflow-x-auto flex-1">
-            <table className="w-full text-center border-collapse">
+            <table className="w-full text-center border-collapse min-w-[700px]">
               <thead>
                 <tr>
                   <th className="p-2 border bg-slate-50 text-slate-500 text-sm w-16">Tiết</th>
@@ -156,9 +168,21 @@ export function WeeklyTimetable() {
 
         {/* Todo List */}
         <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col p-4">
-          <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <CheckSquare className="w-4 h-4 text-emerald-600" /> Việc cần làm (GVCN)
-          </h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+              <CheckSquare className="w-4 h-4 text-emerald-600" /> Việc cần làm (GVCN)
+            </h3>
+            <button
+              onClick={() => {
+                if (window.confirm("Bạn có chắc chắn muốn xóa tất cả công việc?")) {
+                  saveTodos([]);
+                }
+              }}
+              className="text-xs flex items-center gap-1 px-2 py-1 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 rounded-md transition-colors font-medium"
+            >
+              <Trash2 className="w-3 h-3" /> Xóa việc
+            </button>
+          </div>
           
           <div className="flex gap-2 mb-4">
             <input 

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Save, BookOpen, Download, AlertCircle, Upload, Edit3, Eye, Presentation } from "lucide-react";
 import pptxgen from "pptxgenjs";
 import { fullPlan } from "../data/mockData";
@@ -44,11 +44,11 @@ export function LessonPlan() {
   }, [selectedLessonId, availableLessons]);
 
   // Set the first lesson as default when changing grades
-  useMemo(() => {
+  useEffect(() => {
     if (availableLessons.length > 0 && (!selectedLessonId || !availableLessons.find(l => l.id === selectedLessonId))) {
       setSelectedLessonId(availableLessons[0].id);
     }
-  }, [availableLessons]);
+  }, [availableLessons, selectedLessonId]);
   
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -371,8 +371,8 @@ export function LessonPlan() {
             {selectedLesson && (
               <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 text-sm space-y-3">
                 <h3 className="font-semibold text-slate-800 border-b border-slate-200 pb-2">Thông tin bài học:</h3>
-                <p><span className="font-medium text-slate-700">Tên bài:</span> {selectedLesson.lesson}</p>
-                <p><span className="font-medium text-slate-700">Số tiết:</span> {selectedLesson.periods}</p>
+                <p><span className="font-medium text-slate-700">Tên bài:</span> <span className="text-slate-800">{selectedLesson.lesson}</span></p>
+                <p><span className="font-medium text-slate-700">Số tiết:</span> <span className="text-slate-800">{selectedLesson.periods}</span></p>
                 <p><span className="font-medium text-slate-700">Yêu cầu cần đạt:</span> <span className="text-slate-600">{selectedLesson.requirement}</span></p>
                 
                 <div className="pt-2">
