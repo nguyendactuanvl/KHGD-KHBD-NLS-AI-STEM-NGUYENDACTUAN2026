@@ -4,7 +4,7 @@ import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { FileCheck, Sparkles, Shuffle, Download, Share2, Plus, Trash2, Printer } from "lucide-react";
 
 interface Question {
@@ -16,10 +16,31 @@ interface Question {
   correctOptionIndex?: number;
   correctAnswer?: string;
   level: string;
+  topic?: string;
+  subtopic?: string;
+}
+
+interface MatrixConfig {
+  id: string;
+  name: string;
+  schoolLevel: string;
+  subject: string;
+  grade: string;
+  duration: number;
+  examType: string;
+  numCodes: number;
+  qCounts: any;
+  qPoints: any;
+  qEnabled: any;
+  levels: any;
+  outputConfig: any;
+  matrix: string;
+  customPrompt: string;
+  timestamp: number;
 }
 
 export function ExamGenerator() {
-  const [activeTab, setActiveTab] = useState<"matrix" | "exam" | "shuffle">("matrix");
+  const [activeTab, setActiveTab] = useState<"matrix" | "exam" | "shuffle" | "banks">("matrix");
   const [subject, setSubject] = useState("Toán");
   const [grade, setGrade] = useState("9");
   const [totalQuestions, setTotalQuestions] = useState(20);
@@ -32,6 +53,91 @@ export function ExamGenerator() {
   const [duration, setDuration] = useState(45);
   const [examType, setExamType] = useState("15p"); // 15p, mid, final
   const [qCounts, setQCounts] = useState({ mc: 20, tf: 0, sa: 0, essay: 0 });
+  const [schoolLevel, setSchoolLevel] = useState("THCS");
+  const [generateMode, setGenerateMode] = useState<"auto" | "from_matrix_file">("auto");
+  const [bankQuestions, setBankQuestions] = useState<Question[]>(() => {
+    try {
+      const saved = localStorage.getItem('question_banks');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  
+  const saveToBank = (q: Question) => {
+    const updated = [...bankQuestions, {...q, id: Date.now()}];
+    setBankQuestions(updated);
+    localStorage.setItem('question_banks', JSON.stringify(updated));
+    alert("Đã lưu vào ngân hàng câu hỏi!");
+  };
+  
+  const deleteFromBank = (id: number) => {
+    const updated = bankQuestions.filter(q => q.id !== id);
+    setBankQuestions(updated);
+    localStorage.setItem('question_banks', JSON.stringify(updated));
+  };
+  
+  const [bankFilterTopic, setBankFilterTopic] = useState("");
+  const [bankFilterLevel, setBankFilterLevel] = useState("");
+
+  const [qPoints, setQPoints] = useState({ mc: 0.25, tf: 0.5, sa: 0.5, essay: 2 });
+  const [qEnabled, setQEnabled] = useState({ mc: true, tf: true, sa: true, essay: true });
+  const [levels, setLevels] = useState({ nb: 40, th: 30, vd: 20, vdc: 10 });
+  const [outputConfig, setOutputConfig] = useState({ answers: true, matrix: true, spec: true, shuffleQuestions: true, shuffleOptions: true, detailedSolution: true });
+  
+  const [savedConfigs, setSavedConfigs] = useState<MatrixConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem('matrix_configs');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const saveCurrentConfig = () => {
+    const name = prompt("Nhập tên để lưu cấu hình ma trận này (ví dụ: Giữa kì 1 Toán 9):");
+    if (!name) return;
+    const newConfig: MatrixConfig = {
+      id: Date.now().toString(),
+      name,
+      schoolLevel, subject, grade, duration, examType, numCodes,
+      qCounts, qPoints, qEnabled, levels, outputConfig, matrix, customPrompt,
+      timestamp: Date.now()
+    };
+    const updated = [...savedConfigs, newConfig];
+    setSavedConfigs(updated);
+    localStorage.setItem('matrix_configs', JSON.stringify(updated));
+    alert("Đã lưu cấu hình ma trận!");
+  };
+
+  const loadConfig = (id: string) => {
+    if (!id) return;
+    const conf = savedConfigs.find(c => c.id === id);
+    if (conf) {
+      setSchoolLevel(conf.schoolLevel);
+      setSubject(conf.subject);
+      setGrade(conf.grade);
+      setDuration(conf.duration);
+      setExamType(conf.examType);
+      setNumCodes(conf.numCodes);
+      setQCounts(conf.qCounts);
+      setQPoints(conf.qPoints);
+      setQEnabled(conf.qEnabled);
+      setLevels(conf.levels);
+      setOutputConfig(conf.outputConfig);
+      setMatrix(conf.matrix);
+      setCustomPrompt(conf.customPrompt);
+    }
+  };
+
+  const deleteConfig = (id: string) => {
+    if (confirm("Bạn có chắc chắn muốn xóa cấu hình này?")) {
+      const updated = savedConfigs.filter(c => c.id !== id);
+      setSavedConfigs(updated);
+      localStorage.setItem('matrix_configs', JSON.stringify(updated));
+    }
+  };
+
+  
+  const totalQuestionsCalc = (qEnabled.mc ? qCounts.mc : 0) + (qEnabled.tf ? qCounts.tf : 0) + (qEnabled.sa ? qCounts.sa : 0) + (qEnabled.essay ? qCounts.essay : 0);
+  const totalPointsCalc = (qEnabled.mc ? qCounts.mc * qPoints.mc : 0) + (qEnabled.tf ? qCounts.tf * qPoints.tf : 0) + (qEnabled.sa ? qCounts.sa * qPoints.sa : 0) + (qEnabled.essay ? qCounts.essay * qPoints.essay : 0);
+
   const [matrixFile, setMatrixFile] = useState<File | null>(null);
   const [matrixBase64, setMatrixBase64] = useState<string | null>(null);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
@@ -50,13 +156,31 @@ export function ExamGenerator() {
   
   const availableTopics = subject.toLowerCase().includes("toán") ? fullPlan.filter(p => p.grade.toString() === grade).map(p => p.lesson) : [];
 
-  const [examName, setExamName] = useState("");
+const [examName, setExamName] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [matrixStructure, setMatrixStructure] = useState<{topic: string, subtopics: string[]}[]>([]);
+  const [draggedTopicIdx, setDraggedTopicIdx] = useState<number | null>(null);
+  const [draggedSubtopic, setDraggedSubtopic] = useState<{tIdx: number, sIdx: number} | null>(null);
+
+  useEffect(() => {
+     const structure: {topic: string, subtopics: string[]}[] = [];
+     const topics = Array.from(new Set(questions.map(q => q.topic || 'Chung')));
+     for (const t of topics) {
+         const subs = Array.from(new Set(questions.filter(q => (q.topic || 'Chung') === t).map(q => q.subtopic || 'Chung')));
+         structure.push({ topic: t, subtopics: subs });
+     }
+     setMatrixStructure(structure);
+  }, [questions]);
   const [shuffledExams, setShuffledExams] = useState<{code: string, questions: Question[]}[]>([]);
   const [numCodes, setNumCodes] = useState(4);
   const [shareLink, setShareLink] = useState("");
 
   const handleGenerate = async () => {
+    if (generateMode === "from_matrix_file" && !matrixBase64) {
+      alert("Bạn đã chọn 'Bám sát Ma trận đính kèm' nhưng chưa tải file lên. Vui lòng tải file ma trận lên trước.");
+      return;
+    }
+
     setIsGenerating(true);
     setError(null);
     try {
@@ -64,6 +188,33 @@ export function ExamGenerator() {
       if (!apiKey) throw new Error("Vui lòng cài đặt API Key trong phần Cài đặt.");
 
       
+      const activeQCounts = {
+        mc: qEnabled.mc ? qCounts.mc : 0,
+        tf: qEnabled.tf ? qCounts.tf : 0,
+        sa: qEnabled.sa ? qCounts.sa : 0,
+        essay: qEnabled.essay ? qCounts.essay : 0
+      };
+
+      const advancedPrompt = `
+Mức độ nhận thức yêu cầu:
+- Nhận biết: ${levels.nb}%
+- Thông hiểu: ${levels.th}%
+- Vận dụng: ${levels.vd}%
+- Vận dụng cao: ${levels.vdc}%
+
+Yêu cầu xuất ra:
+${outputConfig.answers ? "- Có đáp án chi tiết." : ""}
+${outputConfig.spec ? "- Kèm theo bảng đặc tả." : ""}
+${outputConfig.matrix ? "- Kèm theo ma trận đề." : ""}
+
+${customPrompt}
+`.trim();
+
+      let finalPrompt = advancedPrompt;
+      if (generateMode === "from_matrix_file") {
+        finalPrompt += "\n\nYÊU CẦU QUAN TRỌNG: Hãy sử dụng file đính kèm làm ma trận đề. Soạn các câu hỏi bám sát theo cấu trúc, số lượng câu, mức độ và nội dung được quy định trong file ma trận tải lên này.";
+      }
+
       const response = await fetch("/api/generate-exam", {
         method: "POST",
         headers: {
@@ -71,8 +222,8 @@ export function ExamGenerator() {
           "x-gemini-api-key": apiKey
         },
         body: JSON.stringify({ 
-          subject, grade, duration, examType, matrix, customPrompt,
-          qCounts,
+          subject, grade, duration, examType, matrix, customPrompt: finalPrompt,
+          qCounts: activeQCounts,
           matrixFile: matrixBase64,
           selectedTopics
         })
@@ -230,130 +381,319 @@ export function ExamGenerator() {
             >
               3. Trộn Đề & Xuất Bản
             </button>
+            <button 
+              onClick={() => setActiveTab("banks")}
+              className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'banks' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Ngân hàng câu hỏi
+            </button>
           </div>
 
-          {activeTab === "matrix" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Môn học</label>
-                  <input type="text" value={subject} onChange={e => setSubject(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" />
+                    {activeTab === "matrix" && (
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
+              <div className="flex-1 space-y-6 w-full">
+              
+                <div className="flex flex-col md:flex-row md:items-center justify-between bg-blue-50/50 p-4 rounded-xl border border-blue-100 gap-4">
+                   <div className="flex-1">
+                      <label className="block text-xs font-medium text-blue-800 mb-1">Mở cấu hình ma trận đã lưu</label>
+                      <div className="flex gap-2">
+                         <select onChange={e => loadConfig(e.target.value)} defaultValue="" className="flex-1 px-3 py-2 border border-blue-200 rounded-md text-sm bg-white focus:ring-blue-500">
+                            <option value="" disabled>-- Chọn cấu hình đã lưu --</option>
+                            {savedConfigs.map(c => (
+                               <option key={c.id} value={c.id}>{c.name} ({new Date(c.timestamp).toLocaleDateString()})</option>
+                            ))}
+                         </select>
+                         <button onClick={() => {
+                            const sel = document.querySelector('select') as HTMLSelectElement;
+                            if(sel && sel.value) deleteConfig(sel.value);
+                         }} className="px-3 py-2 bg-red-50 text-red-600 rounded-md border border-red-200 hover:bg-red-100 transition" title="Xóa cấu hình đang chọn"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                   </div>
+                   <button onClick={saveCurrentConfig} className="px-4 py-2 bg-white text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition text-sm font-medium whitespace-nowrap">
+                      + Lưu cấu hình hiện tại
+                   </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Lớp</label>
-                  <input type="text" value={grade} onChange={e => setGrade(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Thời gian (phút)</label>
-                  <input type="number" value={duration} onChange={e => setDuration(Number(e.target.value))} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Loại bài thi</label>
-                  <select value={examType} onChange={e => setExamType(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500">
-                    <option value="15p">15 phút</option>
-                    <option value="45p">1 tiết (45p)</option>
-                    <option value="mid">Giữa kỳ</option>
-                    <option value="final">Cuối kỳ</option>
-                  </select>
-                </div>
-              </div>
 
-              {subject.toLowerCase().includes("toán") && (
-                <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100 space-y-4">
-                  <h3 className="font-semibold text-emerald-800">Cấu trúc đề Toán (Số câu)</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* 1. THÔNG TIN ĐỀ */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">1</span> THÔNG TIN ĐỀ
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
-                      <label className="block text-xs font-medium text-emerald-700 mb-1">Trắc nghiệm</label>
-                      <input type="number" value={qCounts.mc} onChange={e => setQCounts({...qCounts, mc: Number(e.target.value)})} className="w-full px-3 py-1.5 border border-emerald-200 rounded-md focus:ring-emerald-500 bg-white" />
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Cấp học</label>
+                      <select value={schoolLevel} onChange={e=>setSchoolLevel(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm">
+                        <option value="Tiểu học">Tiểu học</option>
+                        <option value="THCS">THCS</option>
+                        <option value="THPT">THPT</option>
+                      </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-emerald-700 mb-1">Đúng/Sai</label>
-                      <input type="number" value={qCounts.tf} onChange={e => setQCounts({...qCounts, tf: Number(e.target.value)})} className="w-full px-3 py-1.5 border border-emerald-200 rounded-md focus:ring-emerald-500 bg-white" />
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Lớp</label>
+                      <input type="text" value={grade} onChange={e=>setGrade(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-emerald-700 mb-1">Trả lời ngắn</label>
-                      <input type="number" value={qCounts.sa} onChange={e => setQCounts({...qCounts, sa: Number(e.target.value)})} className="w-full px-3 py-1.5 border border-emerald-200 rounded-md focus:ring-emerald-500 bg-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-emerald-700 mb-1">Tự luận</label>
-                      <input type="number" value={qCounts.essay} onChange={e => setQCounts({...qCounts, essay: Number(e.target.value)})} className="w-full px-3 py-1.5 border border-emerald-200 rounded-md focus:ring-emerald-500 bg-white" />
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Môn học</label>
+                      <input type="text" value={subject} onChange={e=>setSubject(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm" />
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Loại đề</label>
+                      <select value={examType} onChange={e=>setExamType(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm">
+                        <option value="15p">Kiểm tra 15 phút</option>
+                        <option value="45p">Kiểm tra 1 tiết / 45 phút</option>
+                        <option value="mid">Kiểm tra Giữa kỳ</option>
+                        <option value="final">Kiểm tra Cuối kỳ</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Thời gian (phút)</label>
+                      <input type="number" value={duration} onChange={e=>setDuration(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Số mã đề</label>
+                      <input type="number" value={numCodes} onChange={e=>setNumCodes(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm" />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Tên bài / chủ đề / phạm vi kiến thức</label>
+                      <input type="text" value={matrix} onChange={e=>setMatrix(e.target.value)} placeholder="Ví dụ: Bài 2 - Phương trình bậc nhất hai ẩn..." className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm" />
+                  </div>
+                  <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Yêu cầu riêng của giáo viên</label>
+                      <textarea value={customPrompt} onChange={e=>setCustomPrompt(e.target.value)} placeholder="Nhập yêu cầu bổ sung..." className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm" rows={2}></textarea>
+                  </div>
+                </div>
+
+                {/* 2. TÀI LIỆU GỐC & CHẾ ĐỘ TẠO */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">2</span> TÀI LIỆU GỐC & CHẾ ĐỘ TẠO
+                  </h3>
                   
-                  {availableTopics.length > 0 && (
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-emerald-800 mb-2">Chọn chủ đề từ Kế hoạch giáo dục (Tùy chọn)</label>
-                      <div className="max-h-40 overflow-y-auto bg-white border border-emerald-200 rounded-lg p-2 space-y-1">
-                        {availableTopics.map((topic, i) => (
-                          <label key={i} className="flex items-start gap-2 p-1 hover:bg-emerald-50 rounded cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="mt-1 text-emerald-600 rounded border-emerald-300 focus:ring-emerald-500"
-                              checked={selectedTopics.includes(topic)}
-                              onChange={(e) => {
-                                if (e.target.checked) setSelectedTopics([...selectedTopics, topic]);
-                                else setSelectedTopics(selectedTopics.filter(t => t !== topic));
-                              }}
-                            />
-                            <span className="text-sm text-slate-700">{topic}</span>
-                          </label>
-                        ))}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Chế độ tạo đề:</label>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-slate-50 flex-1 border-slate-200">
+                        <input type="radio" name="generateMode" value="auto" checked={generateMode === "auto"} onChange={() => setGenerateMode("auto")} className="text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                        <span className="text-sm font-medium text-slate-700">Tạo tự động (Dựa vào AI)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-slate-50 flex-1 border-slate-200">
+                        <input type="radio" name="generateMode" value="from_matrix_file" checked={generateMode === "from_matrix_file"} onChange={() => setGenerateMode("from_matrix_file")} className="text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                        <span className="text-sm font-medium text-slate-700">Bám sát Ma trận đính kèm</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">File đính kèm (SGK / Ma trận / Học liệu):</label>
+                    <div className={`w-full px-4 py-3 border rounded-lg h-24 flex items-center justify-center bg-slate-50 border-dashed relative hover:bg-slate-100 transition-colors cursor-pointer mb-2 ${generateMode === 'from_matrix_file' && !matrixFile ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}>
+                      <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,.pdf,.docx,.doc,.xlsx,.xls" />
+                      <div className="text-center">
+                        <span className="text-sm font-medium text-slate-600">{matrixFile ? matrixFile.name : "+ Chọn File đính kèm"}</span>
                       </div>
                     </div>
-                  )}
+                    <p className="text-xs text-slate-400">Hỗ trợ PDF, Word, Excel, Ảnh (JPG, PNG). Tối đa 50MB.</p>
+                  </div>
                 </div>
-              )}
 
-              {!subject.toLowerCase().includes("toán") && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tổng số câu (Trắc nghiệm)</label>
-                  <input type="number" value={totalQuestions} onChange={e => setTotalQuestions(Number(e.target.value))} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" />
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nhập Cấu trúc Ma trận (Thủ công)</label>
-                  <textarea 
-                    value={matrix} 
-                    onChange={e => setMatrix(e.target.value)} 
-                    placeholder="Ví dụ: 50% Đại số (Hệ phương trình), 50% Hình học (Đường tròn). Mức độ: 40% Nhận biết..."
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg h-24 focus:ring-emerald-500 focus:border-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Hoặc Tải lên file Ma trận (Ảnh, PDF, Word)</label>
-                  <div className="w-full px-4 py-3 border border-slate-300 rounded-lg h-24 flex items-center justify-center bg-slate-50 border-dashed relative hover:bg-slate-100 transition-colors cursor-pointer">
-                    <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,.pdf,.docx,.doc" />
-                    <div className="text-center">
-                      <span className="text-sm text-slate-500 font-medium">{matrixFile ? matrixFile.name : "Nhấn hoặc kéo thả file vào đây"}</span>
+                {/* 3. CẤU TRÚC ĐỀ */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">3</span> CẤU TRÚC ĐỀ
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 items-center">
+                      <div className="col-span-5 text-left pl-2">Đang cấu hình</div>
+                      <div className="col-span-2 text-center">Số câu</div>
+                      <div className="col-span-2 text-center">Điểm/câu</div>
+                      <div className="col-span-2 text-center">Tổng</div>
+                      <div className="col-span-1 text-center">Dùng</div>
                     </div>
+
+                    <div className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg ${qEnabled.mc ? 'bg-slate-50 border border-slate-200' : 'opacity-50'}`}>
+                      <div className="col-span-5 flex flex-col">
+                         <span className="font-medium text-sm text-slate-700">Trắc nghiệm lựa chọn</span>
+                         <span className="text-xs text-slate-400">4 lựa chọn</span>
+                      </div>
+                      <div className="col-span-2">
+                         <input type="number" value={qCounts.mc} onChange={e=>setQCounts({...qCounts, mc: Number(e.target.value)})} disabled={!qEnabled.mc} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                      </div>
+                      <div className="col-span-2">
+                         <input type="number" step="0.25" value={qPoints.mc} onChange={e=>setQPoints({...qPoints, mc: Number(e.target.value)})} disabled={!qEnabled.mc} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                      </div>
+                      <div className="col-span-2 text-center text-sm font-medium text-slate-700">
+                         {qEnabled.mc ? qCounts.mc * qPoints.mc : 0}
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                         <input type="checkbox" checked={qEnabled.mc} onChange={e=>setQEnabled({...qEnabled, mc: e.target.checked})} className="w-4 h-4 text-blue-600 rounded" />
+                      </div>
+                    </div>
+
+                    <div className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg ${qEnabled.tf ? 'bg-slate-50 border border-slate-200' : 'opacity-50'}`}>
+                      <div className="col-span-5 flex flex-col">
+                         <span className="font-medium text-sm text-slate-700">Đúng / Sai</span>
+                      </div>
+                      <div className="col-span-2">
+                         <input type="number" value={qCounts.tf} onChange={e=>setQCounts({...qCounts, tf: Number(e.target.value)})} disabled={!qEnabled.tf} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                      </div>
+                      <div className="col-span-2">
+                         <input type="number" step="0.25" value={qPoints.tf} onChange={e=>setQPoints({...qPoints, tf: Number(e.target.value)})} disabled={!qEnabled.tf} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                      </div>
+                      <div className="col-span-2 text-center text-sm font-medium text-slate-700">
+                         {qEnabled.tf ? qCounts.tf * qPoints.tf : 0}
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                         <input type="checkbox" checked={qEnabled.tf} onChange={e=>setQEnabled({...qEnabled, tf: e.target.checked})} className="w-4 h-4 text-blue-600 rounded" />
+                      </div>
+                    </div>
+
+                    <div className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg ${qEnabled.sa ? 'bg-slate-50 border border-slate-200' : 'opacity-50'}`}>
+                      <div className="col-span-5 flex flex-col">
+                         <span className="font-medium text-sm text-slate-700">Trả lời ngắn</span>
+                      </div>
+                      <div className="col-span-2">
+                         <input type="number" value={qCounts.sa} onChange={e=>setQCounts({...qCounts, sa: Number(e.target.value)})} disabled={!qEnabled.sa} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                      </div>
+                      <div className="col-span-2">
+                         <input type="number" step="0.25" value={qPoints.sa} onChange={e=>setQPoints({...qPoints, sa: Number(e.target.value)})} disabled={!qEnabled.sa} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                      </div>
+                      <div className="col-span-2 text-center text-sm font-medium text-slate-700">
+                         {qEnabled.sa ? qCounts.sa * qPoints.sa : 0}
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                         <input type="checkbox" checked={qEnabled.sa} onChange={e=>setQEnabled({...qEnabled, sa: e.target.checked})} className="w-4 h-4 text-blue-600 rounded" />
+                      </div>
+                    </div>
+
+                    <div className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg ${qEnabled.essay ? 'bg-slate-50 border border-slate-200' : 'opacity-50'}`}>
+                      <div className="col-span-5 flex flex-col">
+                         <span className="font-medium text-sm text-slate-700">Tự luận</span>
+                      </div>
+                      <div className="col-span-2">
+                         <input type="number" value={qCounts.essay} onChange={e=>setQCounts({...qCounts, essay: Number(e.target.value)})} disabled={!qEnabled.essay} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                      </div>
+                      <div className="col-span-2">
+                         <input type="number" step="0.25" value={qPoints.essay} onChange={e=>setQPoints({...qPoints, essay: Number(e.target.value)})} disabled={!qEnabled.essay} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                      </div>
+                      <div className="col-span-2 text-center text-sm font-medium text-slate-700">
+                         {qEnabled.essay ? qCounts.essay * qPoints.essay : 0}
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                         <input type="checkbox" checked={qEnabled.essay} onChange={e=>setQEnabled({...qEnabled, essay: e.target.checked})} className="w-4 h-4 text-blue-600 rounded" />
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-200 pt-3 mt-3 flex justify-between items-center bg-blue-50/50 p-3 rounded-lg">
+                       <span className="font-medium text-slate-600 text-sm flex items-center gap-1"><FileCheck className="w-4 h-4" /> Tổng Điểm = {totalPointsCalc}</span>
+                       <span className="text-xs text-slate-400">Tự động tính</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. MỨC ĐỘ NHẬN THỨC */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">4</span> MỨC ĐỘ NHẬN THỨC <span className="font-normal text-xs text-slate-400">(CHỈ THAM KHẢO ĐANG KÉO THAY ĐỔI TỔNG TỐI ĐA 100%)</span>
+                  </h3>
+                  <div className="space-y-4 text-sm">
+                     <div className="flex items-center gap-4">
+                        <div className="w-24 font-medium text-slate-700">Nhận biết</div>
+                        <input type="range" min="0" max="100" className="flex-1 accent-blue-600" value={levels.nb} onChange={e=>setLevels({...levels, nb: Number(e.target.value)})} />
+                        <div className="w-12 text-right font-medium">{levels.nb}%</div>
+                     </div>
+                     <div className="flex items-center gap-4">
+                        <div className="w-24 font-medium text-slate-700">Thông hiểu</div>
+                        <input type="range" min="0" max="100" className="flex-1 accent-blue-600" value={levels.th} onChange={e=>setLevels({...levels, th: Number(e.target.value)})} />
+                        <div className="w-12 text-right font-medium">{levels.th}%</div>
+                     </div>
+                     <div className="flex items-center gap-4">
+                        <div className="w-24 font-medium text-slate-700">Vận dụng</div>
+                        <input type="range" min="0" max="100" className="flex-1 accent-blue-600" value={levels.vd} onChange={e=>setLevels({...levels, vd: Number(e.target.value)})} />
+                        <div className="w-12 text-right font-medium">{levels.vd}%</div>
+                     </div>
+                     <div className="flex items-center gap-4">
+                        <div className="w-24 font-medium text-slate-700">Vận dụng cao</div>
+                        <input type="range" min="0" max="100" className="flex-1 accent-blue-600" value={levels.vdc} onChange={e=>setLevels({...levels, vdc: Number(e.target.value)})} />
+                        <div className="w-12 text-right font-medium">{levels.vdc}%</div>
+                     </div>
+                     
+                     <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-start gap-1">
+                        <Sparkles className="w-4 h-4 shrink-0" /> Để phân bổ đúng 100%, muốn tăng một mức, cần giảm một mức khác trước.
+                     </div>
+                  </div>
+                </div>
+
+                {/* 5. THÀNH PHẦN ĐẦU RA */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-12">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">5</span> THÀNH PHẦN ĐẦU RA
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-slate-700">
+                     <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={outputConfig.answers} onChange={e=>setOutputConfig({...outputConfig, answers: e.target.checked})} className="w-4 h-4 text-blue-600 rounded border-slate-300" /> Đáp án và thang điểm</label>
+                     <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={outputConfig.matrix} onChange={e=>setOutputConfig({...outputConfig, matrix: e.target.checked})} className="w-4 h-4 text-blue-600 rounded border-slate-300" /> Ma trận đề kiểm tra</label>
+                     <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={outputConfig.spec} onChange={e=>setOutputConfig({...outputConfig, spec: e.target.checked})} className="w-4 h-4 text-blue-600 rounded border-slate-300" /> Bản đặc tả đề kiểm tra</label>
+                     <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={outputConfig.shuffleOptions} onChange={e=>setOutputConfig({...outputConfig, shuffleOptions: e.target.checked})} className="w-4 h-4 text-blue-600 rounded border-slate-300" /> Trộn thứ tự phương án trắc nghiệm</label>
+                     <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={outputConfig.shuffleQuestions} onChange={e=>setOutputConfig({...outputConfig, shuffleQuestions: e.target.checked})} className="w-4 h-4 text-blue-600 rounded border-slate-300" /> Trộn thứ tự câu giữa các mã đề</label>
+                     <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={outputConfig.detailedSolution} onChange={e=>setOutputConfig({...outputConfig, detailedSolution: e.target.checked})} className="w-4 h-4 text-blue-600 rounded border-slate-300" /> Lời giải chi tiết</label>
+                  </div>
+                  <div className="mt-8 flex gap-4">
+                     <button onClick={handleGenerate} disabled={isGenerating} className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center gap-2 transition-colors disabled:opacity-70 shadow-sm">
+                        {isGenerating ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Sparkles className="w-5 h-5" />} 
+                        {isGenerating ? "ĐANG TẠO ĐỀ..." : "+ TẠO ĐỀ BẰNG AI"}
+                     </button>
+                     <button onClick={() => {
+                       setQCounts({ mc: 20, tf: 0, sa: 0, essay: 0 });
+                       setMatrix(""); setCustomPrompt(""); setMatrixFile(null); setMatrixBase64(null);
+                     }} className="px-6 py-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors">
+                        Làm mới
+                     </button>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Yêu cầu bổ sung (Tùy chọn)</label>
-                <textarea 
-                  value={customPrompt} 
-                  onChange={e => setCustomPrompt(e.target.value)} 
-                  placeholder="Ví dụ: Đề bám sát đề minh họa BGD..."
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg h-20 focus:ring-emerald-500 focus:border-emerald-500"
-                />
+              {/* RIGHT SIDEBAR - TÓM TẮT */}
+              <div className="w-full lg:w-80 shrink-0 sticky top-6">
+                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-blue-50 border-b border-slate-200 p-4">
+                       <h3 className="font-bold text-slate-800 text-sm">TÓM TẮT CẤU HÌNH</h3>
+                    </div>
+                    <div className="p-4 space-y-4">
+                       <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                          <span className="text-sm text-slate-600">Tổng số câu</span>
+                          <span className="font-bold text-slate-800">{totalQuestionsCalc}</span>
+                       </div>
+                       <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                          <span className="text-sm text-slate-600">Tổng điểm</span>
+                          <span className="font-bold text-slate-800">{totalPointsCalc}</span>
+                       </div>
+                       <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                          <span className="text-sm text-slate-600">Thời lượng ước tính</span>
+                          <span className="font-bold text-slate-800">{duration}'</span>
+                       </div>
+                       <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                          <span className="text-sm text-slate-600">Thời gian đề</span>
+                          <span className="font-bold text-slate-800">{duration}'</span>
+                       </div>
+                       <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                          <span className="text-sm text-slate-600">Số mã đề</span>
+                          <span className="font-bold text-slate-800">{numCodes}</span>
+                       </div>
+                       <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                          <span className="text-sm text-slate-600">Học liệu</span>
+                          <span className="font-bold text-slate-800">{matrixFile ? '1 tệp' : '0'}</span>
+                       </div>
+                       <div className="flex justify-between items-center">
+                          <span className="text-sm text-slate-600">Model</span>
+                          <span className="font-bold text-slate-800">gemini-3.5-flash</span>
+                       </div>
+                    </div>
+                 </div>
               </div>
-              
-              {error && <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">{error}</div>}
-              
-              <button 
-                onClick={handleGenerate} 
-                disabled={isGenerating}
-                className="w-full py-3 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 flex items-center justify-center gap-2 transition-colors disabled:opacity-70"
-              >
-                {isGenerating ? <Sparkles className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                {isGenerating ? "Đang tạo đề bằng AI..." : "Tạo Đề Gốc Bằng AI"}
-              </button>
             </div>
           )}
+
 
           {activeTab === "exam" && (
             <div className="space-y-6">
@@ -374,11 +714,316 @@ export function ExamGenerator() {
                     </div>
                   </div>
                   
+                  
+                  {/* MA TRẬN */}
+                  {outputConfig.matrix && (
+                    <div className="border border-slate-200 rounded-lg p-6 space-y-6 bg-white overflow-x-auto printable-matrix" id="matrix-container">
+                      <div className="flex justify-between items-center mb-4 no-print">
+                        <div className="flex-1 text-center">
+                          <h2 className="text-xl font-bold">MA TRẬN ĐỀ KIỂM TRA</h2>
+                          <p className="text-sm text-slate-500 font-normal no-print italic mt-1">💡 Mẹo: Bấm giữ và kéo thả các hàng (chủ đề hoặc nội dung) để sắp xếp lại thứ tự</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => {
+                                const html = document.getElementById('matrix-table-wrap')?.innerHTML;
+                                if (!html) return;
+                                const preHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Ma Tran</title><style>table { border-collapse: collapse; width: 100%; font-family: "Times New Roman", Times, serif; font-size: 11pt; } th, td { border: 1px solid black; padding: 4px; text-align: center; } th { font-weight: bold; }</style></head><body><div style="text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 20px;">MA TRẬN ĐỀ KIỂM TRA ĐỊNH KÌ</div>`;
+                                const postHtml = "</body></html>";
+                                const blob = new Blob(['\ufeff', preHtml + html + postHtml], { type: 'application/msword' });
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = 'Ma_Tran_De_Kiem_Tra.doc';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                            }} className="px-3 py-1.5 bg-blue-50 text-blue-600 font-medium rounded hover:bg-blue-100 flex items-center gap-2 text-sm border border-blue-200 no-print">
+                              Xuất Word
+                            </button>
+                            <button onClick={() => window.print()} className="px-3 py-1.5 bg-slate-50 text-slate-600 font-medium rounded hover:bg-slate-200 flex items-center gap-2 text-sm border border-slate-300 no-print">
+                              <Printer className="w-4 h-4" /> In PDF
+                            </button>
+                        </div>
+                      </div>
+                      <div id="matrix-table-wrap">
+                          <table className="w-full border-collapse border border-black text-[13px] min-w-[1000px] font-serif text-black" style={{fontFamily: '"Times New Roman", Times, serif'}}>
+                            <thead>
+                              <tr>
+                                <th className="border border-black p-1 text-center font-bold" rowSpan={4}>TT</th>
+                                <th className="border border-black p-1 text-center font-bold" rowSpan={4}>Chủ đề/Chương</th>
+                                <th className="border border-black p-1 text-center font-bold" rowSpan={4}>Nội dung/đơn vị kiến thức</th>
+                                <th className="border border-black p-1 text-center font-bold" colSpan={16}>Mức độ đánh giá</th>
+                                <th className="border border-black p-1 text-center font-bold" colSpan={4} rowSpan={3}>Tổng</th>
+                                <th className="border border-black p-1 text-center font-bold" rowSpan={4}>Tỉ lệ %<br/>điểm</th>
+                              </tr>
+                              <tr>
+                                <th className="border border-black p-1 text-center font-bold" colSpan={8}>TNKQ</th>
+                                <th className="border border-black p-1 text-center font-bold" colSpan={4} rowSpan={2}>Trả lời ngắn</th>
+                                <th className="border border-black p-1 text-center font-bold" colSpan={4} rowSpan={2}>Tự luận</th>
+                              </tr>
+                              <tr>
+                                <th className="border border-black p-1 text-center font-bold" colSpan={4}>Nhiều lựa chọn</th>
+                                <th className="border border-black p-1 text-center font-bold" colSpan={4}>"Đúng - Sai"</th>
+                              </tr>
+                              <tr>
+                                {Array.from({length: 4}).map((_, i) => (
+                                    <td key={`sub-${i}`} className="p-0 border-0">
+                                      <table className="w-full h-full border-collapse"><tbody><tr>
+                                        <th className="border-r border-black p-1 text-center font-bold w-1/4">Biết</th>
+                                        <th className="border-r border-black p-1 text-center font-bold w-1/4">Hiểu</th>
+                                        <th className="border-r border-black p-1 text-center font-bold w-1/4">VD</th>
+                                        <th className="border-0 p-1 text-center font-bold w-1/4">VDC</th>
+                                      </tr></tbody></table>
+                                    </td>
+                                ))}
+                                <th className="border border-black p-1 text-center font-bold">Biết</th>
+                                <th className="border border-black p-1 text-center font-bold">Hiểu</th>
+                                <th className="border border-black p-1 text-center font-bold">VD</th>
+                                <th className="border border-black p-1 text-center font-bold">VDC</th>
+                              </tr>
+                            </thead>
+                            
+                              {matrixStructure.map((topicObj, tIdx) => {
+                                 const topic = topicObj.topic;
+                                 const topicQs = questions.filter(q => (q.topic || 'Chung') === topic);
+                                 
+                                 return (
+                                   <tbody 
+                                      key={`topic-${tIdx}`}
+                                      draggable
+                                      onDragStart={(e) => { 
+                                          setDraggedTopicIdx(tIdx); 
+                                      }}
+                                      onDragOver={(e) => { 
+                                          e.preventDefault(); 
+                                      }}
+                                      onDrop={(e) => {
+                                         if (draggedTopicIdx !== null && draggedTopicIdx !== tIdx) {
+                                             const newStruct = [...matrixStructure];
+                                             const [moved] = newStruct.splice(draggedTopicIdx, 1);
+                                             newStruct.splice(tIdx, 0, moved);
+                                             setMatrixStructure(newStruct);
+                                         }
+                                         setDraggedTopicIdx(null);
+                                      }}
+                                      onDragEnd={() => setDraggedTopicIdx(null)}
+                                      className={draggedTopicIdx === tIdx ? 'opacity-30 bg-slate-100' : 'hover:bg-slate-50 transition-colors'}
+                                      title="💡 Kéo thả mảng chủ đề này để đổi vị trí"
+                                   >
+                                     {topicObj.subtopics.map((sub, sIdx) => {
+                                        const subQs = topicQs.filter(q => (q.subtopic || 'Chung') === sub);
+                                        
+                                        const getLevelCount = (type: string, lvl: string) => {
+                                            return subQs.filter(q => {
+                                                if (q.type !== type) return false;
+                                                const l = (q.level || '').toLowerCase();
+                                                if (lvl === 'nb') return l.includes('biết');
+                                                if (lvl === 'th') return l.includes('hiểu');
+                                                if (lvl === 'vdc') return l.includes('cao');
+                                                if (lvl === 'vd') return l.includes('dụng') && !l.includes('cao');
+                                                return false;
+                                            }).length;
+                                        };
+
+                                        const rowData = {
+                                            mc: { nb: getLevelCount('mc','nb'), th: getLevelCount('mc','th'), vd: getLevelCount('mc','vd'), vdc: getLevelCount('mc','vdc') },
+                                            tf: { nb: getLevelCount('tf','nb'), th: getLevelCount('tf','th'), vd: getLevelCount('tf','vd'), vdc: getLevelCount('tf','vdc') },
+                                            sa: { nb: getLevelCount('sa','nb'), th: getLevelCount('sa','th'), vd: getLevelCount('sa','vd'), vdc: getLevelCount('sa','vdc') },
+                                            es: { nb: getLevelCount('essay','nb'), th: getLevelCount('essay','th'), vd: getLevelCount('essay','vd'), vdc: getLevelCount('essay','vdc') }
+                                        };
+                                        
+                                        const totalNB = rowData.mc.nb + rowData.tf.nb + rowData.sa.nb + rowData.es.nb;
+                                        const totalTH = rowData.mc.th + rowData.tf.th + rowData.sa.th + rowData.es.th;
+                                        const totalVD = rowData.mc.vd + rowData.tf.vd + rowData.sa.vd + rowData.es.vd;
+                                        const totalVDC = rowData.mc.vdc + rowData.tf.vdc + rowData.sa.vdc + rowData.es.vdc;
+                                        
+                                        const rowPoints = 
+                                            (rowData.mc.nb + rowData.mc.th + rowData.mc.vd + rowData.mc.vdc) * qPoints.mc +
+                                            (rowData.tf.nb + rowData.tf.th + rowData.tf.vd + rowData.tf.vdc) * qPoints.tf +
+                                            (rowData.sa.nb + rowData.sa.th + rowData.sa.vd + rowData.sa.vdc) * qPoints.sa +
+                                            (rowData.es.nb + rowData.es.th + rowData.es.vd + rowData.es.vdc) * qPoints.essay;
+                                        const rowPercent = totalPointsCalc > 0 ? Math.round((rowPoints / totalPointsCalc) * 100) : 0;
+
+                                        return (
+                                          <tr 
+                                            key={`sub-${tIdx}-${sIdx}`}
+                                            draggable
+                                            onDragStart={(e) => { 
+                                                e.stopPropagation(); 
+                                                setDraggedSubtopic({ tIdx, sIdx }); 
+                                            }}
+                                            onDragOver={(e) => { 
+                                                e.preventDefault(); 
+                                                e.stopPropagation(); 
+                                            }}
+                                            onDrop={(e) => {
+                                                e.stopPropagation();
+                                                if (draggedSubtopic && draggedSubtopic.tIdx === tIdx && draggedSubtopic.sIdx !== sIdx) {
+                                                    const newStruct = [...matrixStructure];
+                                                    const subs = [...newStruct[tIdx].subtopics];
+                                                    const [moved] = subs.splice(draggedSubtopic.sIdx, 1);
+                                                    subs.splice(sIdx, 0, moved);
+                                                    newStruct[tIdx].subtopics = subs;
+                                                    setMatrixStructure(newStruct);
+                                                }
+                                                setDraggedSubtopic(null);
+                                            }}
+                                            onDragEnd={(e) => { 
+                                                e.stopPropagation(); 
+                                                setDraggedSubtopic(null); 
+                                            }}
+                                            className={draggedSubtopic?.tIdx === tIdx && draggedSubtopic?.sIdx === sIdx ? 'opacity-30 bg-blue-100' : 'cursor-move'}
+                                            title="💡 Kéo thả hàng này để đổi vị trí nội dung kiến thức"
+                                          >
+                                            {sIdx === 0 && <td className="border border-black p-1 text-center" rowSpan={topicObj.subtopics.length}>{tIdx + 1}</td>}
+                                            {sIdx === 0 && <td className="border border-black p-1" rowSpan={topicObj.subtopics.length}>{topic}</td>}
+                                            <td className="border border-black p-1">{sub}</td>
+                                            
+                                            {/* Nhiều lựa chọn */}
+                                            <td className="border border-black p-1 text-center">{rowData.mc.nb || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.mc.th || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.mc.vd || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.mc.vdc || ''}</td>
+                                            
+                                            {/* Đúng sai */}
+                                            <td className="border border-black p-1 text-center">{rowData.tf.nb || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.tf.th || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.tf.vd || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.tf.vdc || ''}</td>
+                                            
+                                            {/* Trả lời ngắn */}
+                                            <td className="border border-black p-1 text-center">{rowData.sa.nb || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.sa.th || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.sa.vd || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.sa.vdc || ''}</td>
+                                            
+                                            {/* Tự luận */}
+                                            <td className="border border-black p-1 text-center">{rowData.es.nb || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.es.th || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.es.vd || ''}</td>
+                                            <td className="border border-black p-1 text-center">{rowData.es.vdc || ''}</td>
+                                            
+                                            {/* Tổng */}
+                                            <td className="border border-black p-1 text-center font-bold">{totalNB || ''}</td>
+                                            <td className="border border-black p-1 text-center font-bold">{totalTH || ''}</td>
+                                            <td className="border border-black p-1 text-center font-bold">{totalVD || ''}</td>
+                                            <td className="border border-black p-1 text-center font-bold">{totalVDC || ''}</td>
+                                            
+                                            <td className="border border-black p-1 text-center">{rowPercent > 0 ? rowPercent + '%' : ''}</td>
+                                          </tr>
+                                        );
+                                     })}
+                                   </tbody>
+                                 );
+                              })}
+                              
+                              {/* Dòng TỔNG CỘNG */}
+                              <tbody className="no-drag">
+                                {(() => {
+                                    const getGlobalCount = (type: string, lvl: string) => {
+                                          return questions.filter(q => {
+                                              if (q.type !== type) return false;
+                                              const l = (q.level || '').toLowerCase();
+                                              if (lvl === 'nb') return l.includes('biết');
+                                              if (lvl === 'th') return l.includes('hiểu');
+                                              if (lvl === 'vdc') return l.includes('cao');
+                                              if (lvl === 'vd') return l.includes('dụng') && !l.includes('cao');
+                                              return false;
+                                          }).length;
+                                    };
+                                    const totals = {
+                                        mc: { nb: getGlobalCount('mc','nb'), th: getGlobalCount('mc','th'), vd: getGlobalCount('mc','vd'), vdc: getGlobalCount('mc','vdc') },
+                                        tf: { nb: getGlobalCount('tf','nb'), th: getGlobalCount('tf','th'), vd: getGlobalCount('tf','vd'), vdc: getGlobalCount('tf','vdc') },
+                                        sa: { nb: getGlobalCount('sa','nb'), th: getGlobalCount('sa','th'), vd: getGlobalCount('sa','vd'), vdc: getGlobalCount('sa','vdc') },
+                                        es: { nb: getGlobalCount('essay','nb'), th: getGlobalCount('essay','th'), vd: getGlobalCount('essay','vd'), vdc: getGlobalCount('essay','vdc') }
+                                    };
+                                    const gNB = totals.mc.nb + totals.tf.nb + totals.sa.nb + totals.es.nb;
+                                    const gTH = totals.mc.th + totals.tf.th + totals.sa.th + totals.es.th;
+                                    const gVD = totals.mc.vd + totals.tf.vd + totals.sa.vd + totals.es.vd;
+                                    const gVDC = totals.mc.vdc + totals.tf.vdc + totals.sa.vdc + totals.es.vdc;
+                                    
+                                    const pts = {
+                                        mc: totals.mc.nb*qPoints.mc + totals.mc.th*qPoints.mc + totals.mc.vd*qPoints.mc + totals.mc.vdc*qPoints.mc,
+                                        tf: totals.tf.nb*qPoints.tf + totals.tf.th*qPoints.tf + totals.tf.vd*qPoints.tf + totals.tf.vdc*qPoints.tf,
+                                        sa: totals.sa.nb*qPoints.sa + totals.sa.th*qPoints.sa + totals.sa.vd*qPoints.sa + totals.sa.vdc*qPoints.sa,
+                                        es: totals.es.nb*qPoints.essay + totals.es.th*qPoints.essay + totals.es.vd*qPoints.essay + totals.es.vdc*qPoints.essay
+                                    };
+                                    const globalTotalPts = pts.mc + pts.tf + pts.sa + pts.es;
+                                    
+                                    return (
+                                      <>
+                                          <tr className="font-bold bg-slate-50">
+                                              <td className="border border-black p-1 text-center" colSpan={3}>Tổng số câu</td>
+                                              <td className="border border-black p-1 text-center">{totals.mc.nb || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.mc.th || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.mc.vd || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.mc.vdc || ''}</td>
+                                              
+                                              <td className="border border-black p-1 text-center">{totals.tf.nb || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.tf.th || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.tf.vd || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.tf.vdc || ''}</td>
+                                              
+                                              <td className="border border-black p-1 text-center">{totals.sa.nb || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.sa.th || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.sa.vd || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.sa.vdc || ''}</td>
+                                              
+                                              <td className="border border-black p-1 text-center">{totals.es.nb || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.es.th || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.es.vd || ''}</td>
+                                              <td className="border border-black p-1 text-center">{totals.es.vdc || ''}</td>
+                                              
+                                              <td className="border border-black p-1 text-center">{gNB || ''}</td>
+                                              <td className="border border-black p-1 text-center">{gTH || ''}</td>
+                                              <td className="border border-black p-1 text-center">{gVD || ''}</td>
+                                              <td className="border border-black p-1 text-center">{gVDC || ''}</td>
+                                              <td className="border border-black p-1 text-center">{gNB+gTH+gVD+gVDC}</td>
+                                          </tr>
+                                          <tr className="font-bold bg-slate-50">
+                                              <td className="border border-black p-1 text-center" colSpan={3}>Tổng số điểm</td>
+                                              <td className="border border-black p-1 text-center" colSpan={4}>{pts.mc > 0 ? pts.mc : ''}</td>
+                                              <td className="border border-black p-1 text-center" colSpan={4}>{pts.tf > 0 ? pts.tf : ''}</td>
+                                              <td className="border border-black p-1 text-center" colSpan={4}>{pts.sa > 0 ? pts.sa : ''}</td>
+                                              <td className="border border-black p-1 text-center" colSpan={4}>{pts.es > 0 ? pts.es : ''}</td>
+                                              <td className="border border-black p-1 text-center" colSpan={4}>{globalTotalPts > 0 ? globalTotalPts : ''}</td>
+                                              <td className="border border-black p-1 text-center">10.0</td>
+                                          </tr>
+                                          <tr className="font-bold bg-slate-50">
+                                              <td className="border border-black p-1 text-center" colSpan={3}>Tỉ lệ %</td>
+                                              <td className="border border-black p-1 text-center" colSpan={4}>{globalTotalPts > 0 ? Math.round(pts.mc/globalTotalPts*100) + '%' : ''}</td>
+                                              <td className="border border-black p-1 text-center" colSpan={4}>{globalTotalPts > 0 ? Math.round(pts.tf/globalTotalPts*100) + '%' : ''}</td>
+                                              <td className="border border-black p-1 text-center" colSpan={4}>{globalTotalPts > 0 ? Math.round(pts.sa/globalTotalPts*100) + '%' : ''}</td>
+                                              <td className="border border-black p-1 text-center" colSpan={4}>{globalTotalPts > 0 ? Math.round(pts.es/globalTotalPts*100) + '%' : ''}</td>
+                                              <td className="border border-black p-1 text-center" colSpan={5}>100%</td>
+                                          </tr>
+                                      </>
+                                    );
+                                })()}
+                              </tbody>
+
+                          </table>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="border border-slate-200 rounded-lg p-6 space-y-6 bg-white" id="original-exam">
+
                     <h2 className="text-xl font-bold text-center mb-6">{examName}</h2>
                     {questions.map((q, idx) => (
                       <div key={idx} className="pb-4 border-b border-slate-100 last:border-0">
-                        <div className="font-medium text-slate-800 mb-3 flex items-start gap-2"><span className="font-bold whitespace-nowrap mt-1">Câu {idx + 1}:</span> <div className="markdown-body flex-1"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.content}</Markdown></div> <span className="text-xs text-emerald-600 font-normal mt-1 shrink-0">[{q.level}]</span></div>
+                        <div className="font-medium text-slate-800 mb-3 flex items-start gap-2">
+                          <span className="font-bold whitespace-nowrap mt-1">Câu {idx + 1}:</span> 
+                          <div className="markdown-body flex-1"><Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]} >{q.content}</Markdown></div> 
+                          <span className="text-xs text-emerald-600 font-normal mt-1 shrink-0">[{q.level}]</span>
+                          <button onClick={() => saveToBank(q)} className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded border border-blue-200 hover:bg-blue-100 shrink-0 no-print" title="Lưu vào Ngân hàng CH">+ Lưu NH</button>
+                          <button onClick={() => {
+                            if (confirm("Xóa câu hỏi này khỏi đề?")) {
+                               const updated = questions.filter(item => item.id !== q.id);
+                               setQuestions(updated);
+                            }
+                          }} className="text-xs px-2 py-1 bg-red-50 text-red-600 rounded border border-red-200 hover:bg-red-100 shrink-0 no-print" title="Xóa khỏi đề">Xóa</button>
+                        </div>
                         
                         {q.type === 'mc' && q.options && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-4">

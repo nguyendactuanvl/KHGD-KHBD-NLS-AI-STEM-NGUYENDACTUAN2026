@@ -659,9 +659,12 @@ Chú ý: Nội dung câu hỏi KHÔNG BAO GỒM các tiền tố như "Câu 1:".
                     options: { type: Type.ARRAY, items: { type: Type.STRING } },
                     correctOptionIndex: { type: Type.NUMBER },
                     correctAnswer: { type: Type.STRING },
-                    level: { type: Type.STRING }
+                    level: { type: Type.STRING },
+                    topic: { type: Type.STRING, description: "Chủ đề hoặc Chương. Bắt buộc." },
+                    subtopic: { type: Type.STRING, description: "Nội dung hoặc Đơn vị kiến thức. Bắt buộc." },
+                    explanation: { type: Type.STRING }
                   },
-                  required: ["id", "type", "content", "level"]
+                  required: ["id", "type", "content", "level", "topic", "subtopic"]
                 }
               }
             },

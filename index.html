@@ -22,7 +22,41 @@
         });
       }
     </script>
+  
+    <style>
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        .printable-matrix, .printable-matrix * {
+          visibility: visible;
+        }
+        .printable-matrix {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          border: none !important;
+          box-shadow: none !important;
+          background: white !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        /* Override app wrappers to prevent clipping */
+        html, body, #root, .h-screen, .overflow-hidden, .overflow-y-auto {
+          height: auto !important;
+          min-height: auto !important;
+          overflow: visible !important;
+          position: static !important;
+          background: white !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+      }
+    </style>
   </head>
+
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

@@ -11,7 +11,7 @@ export function Sidebar({ activeTab, setActiveTab, onOpenSettings }: SidebarProp
   const navItems = [
     { id: "gamification", label: "Thi đua & Gọi tên", icon: Trophy },
     { id: "classmap", label: "Sơ đồ lớp", icon: Users },
-    { id: "homeroom", label: "Quản lý lớp CN", icon: ShieldCheck },
+    { id: "homeroom", label: "Sổ Chủ Nhiệm & QL", icon: ShieldCheck },
     { id: "timetable", label: "TKB & Công việc", icon: CalendarDays },
     { id: "exam", label: "Tạo & Trộn đề", icon: FileCheck },
     { id: "khgd", label: "Kế hoạch giáo dục", icon: Calendar },
@@ -19,7 +19,7 @@ export function Sidebar({ activeTab, setActiveTab, onOpenSettings }: SidebarProp
     { id: "worksheets", label: "Phiếu học tập", icon: ClipboardList },
     { id: "exercise", label: "Giải bài tập", icon: Sparkles },
     { id: "pdf2word", label: "Chuyển PDF sang Word", icon: FileEdit },
-    { id: "circulars", label: "Kiểm tra thông tư", icon: FileText },
+    { id: "circulars", label: "Tài liệu & Thông tư", icon: FileText },
     { id: "history", label: "Lịch sử đã tạo", icon: Clock },
   ];
 

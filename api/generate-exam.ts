@@ -113,7 +113,10 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
         correct: rightAns,
         correctAnswer: correctAnsStr,
         correctOptionIndex: correctOptionIndex,
-        explanation: explain
+        explanation: explain,
+        level: q.level || 'Nhận biết',
+        topic: q.topic || 'Chung',
+        subtopic: q.subtopic || 'Chung'
       };
     });
 
@@ -121,7 +124,7 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
       success: true,
       data: { ...parsedData, questions: formattedQuestions },
       questions: formattedQuestions,
-      examName: parsedData.title || \`Đề kiểm tra \${subject}\`,
+      examName: parsedData.title || `Đề kiểm tra \${subject}`,
       exam: { ...parsedData, questions: formattedQuestions },
       result: { ...parsedData, questions: formattedQuestions }
     });
