@@ -162,7 +162,7 @@ export function Gamification() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-gemini-api-key": key
+            "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
           },
           body: JSON.stringify({ file: base64, type: "students" })
         });
@@ -292,7 +292,7 @@ export function Gamification() {
 
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "") },
         body: JSON.stringify({ prompt: aiQuery, context: rankedData })
       });
       const data = await res.json();

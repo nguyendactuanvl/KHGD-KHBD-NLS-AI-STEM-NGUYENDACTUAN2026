@@ -27,7 +27,7 @@ function getAiClient(req: express.Request) {
 // Helper function to bypass quota limits by using fallback models
 async function generateWithFallback(req: express.Request, payloadOptions: any) {
   const client = getAiClient(req);
-  const models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+  const models = ["gemini-3.6-flash", "gemini-3.1-pro-preview"];
   
   let lastError: any;
   for (const model of models) {
@@ -50,6 +50,47 @@ async function generateWithFallback(req: express.Request, payloadOptions: any) {
 }
 
 const sharedExamsStore = new Map();
+
+
+function handleAiError(error: any, req: express.Request, res: express.Response) {
+  const errorMsg = error?.message || "";
+  const isCustomKey = !!req.headers['x-gemini-api-key'];
+
+  if (errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("service account is deleted") || error?.status === 401 || errorMsg.includes("ACCOUNT_STATE_INVALID")) {
+    if (!isCustomKey) {
+        return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+    }
+    return res.status(400).json({ error: "Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa. Vui lòng tạo API Key mới." });
+  }
+
+  if (errorMsg.includes("suspended") || errorMsg.includes("PERMISSION_DENIED") || error?.status === 403) {
+    if (!isCustomKey) {
+        return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+    }
+    return res.status(400).json({ error: "API Key cá nhân của bạn đã bị khóa (Suspended) bởi Google. Vui lòng vào Cài đặt đổi API Key khác." });
+  }
+
+  if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
+    return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
+  }
+
+  if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
+    if (!isCustomKey) {
+        return res.status(429).json({ error: "Hệ thống AI hiện đang quá tải do có nhiều người sử dụng. Vui lòng vào Cài đặt hệ thống để điền API Key cá nhân của bạn để dùng riêng và không bị giới hạn." });
+    }
+    return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc dùng API Key khác." });
+  }
+
+  if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
+    return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
+  }
+  
+  if (errorMsg.includes("Unsupported MIME type")) {
+    return res.status(400).json({ error: "Định dạng file không được AI hỗ trợ. Vui lòng chuyển file sang định dạng PDF và thử lại." });
+  }
+
+  return res.status(500).json({ error: "Lỗi trong quá trình kết nối AI: " + errorMsg });
+}
 
 export const app = express();
 
@@ -120,11 +161,29 @@ export const app = express();
     } catch (error: any) {
       console.error("AI Generation error:", error);
       const errorMsg = error?.message || "";
+
+
+      const isCustomKey = !!req.headers['x-gemini-api-key'];
+      if (errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("service account is deleted") || error?.status === 401) {
+        if (!isCustomKey) {
+            return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+        }
+        return res.status(400).json({ error: "Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa. Vui lòng tạo API Key mới." });
+      }
+      if (errorMsg.includes("suspended") || errorMsg.includes("PERMISSION_DENIED") || error?.status === 403) {
+        if (!isCustomKey) {
+            return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+        }
+        return res.status(400).json({ error: "API Key cá nhân của bạn đã bị khóa (Suspended) bởi Google. Vui lòng vào Cài đặt đổi API Key khác." });
+      }
       if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
         return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
       }
       if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
-        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
+        if (!isCustomKey) {
+            return res.status(429).json({ error: "Hệ thống AI hiện đang quá tải do có nhiều người sử dụng. Vui lòng vào Cài đặt hệ thống để điền API Key cá nhân của bạn để dùng riêng và không bị giới hạn." });
+        }
+        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc dùng API Key khác." });
       }
       if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
         return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
@@ -176,11 +235,29 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế.`;
     } catch (error: any) {
       console.error("AI Generation error:", error);
       const errorMsg = error?.message || "";
+
+
+      const isCustomKey = !!req.headers['x-gemini-api-key'];
+      if (errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("service account is deleted") || error?.status === 401) {
+        if (!isCustomKey) {
+            return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+        }
+        return res.status(400).json({ error: "Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa. Vui lòng tạo API Key mới." });
+      }
+      if (errorMsg.includes("suspended") || errorMsg.includes("PERMISSION_DENIED") || error?.status === 403) {
+        if (!isCustomKey) {
+            return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+        }
+        return res.status(400).json({ error: "API Key cá nhân của bạn đã bị khóa (Suspended) bởi Google. Vui lòng vào Cài đặt đổi API Key khác." });
+      }
       if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
         return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
       }
       if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
-        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
+        if (!isCustomKey) {
+            return res.status(429).json({ error: "Hệ thống AI hiện đang quá tải do có nhiều người sử dụng. Vui lòng vào Cài đặt hệ thống để điền API Key cá nhân của bạn để dùng riêng và không bị giới hạn." });
+        }
+        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc dùng API Key khác." });
       }
       if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
         return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
@@ -248,6 +325,21 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế. Nếu không tìm th
     } catch (error: any) {
       console.error("AI File Generation error:", error);
       const errorMsg = error?.message || "";
+
+
+      const isCustomKey = !!req.headers['x-gemini-api-key'];
+      if (errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("service account is deleted") || error?.status === 401) {
+        if (!isCustomKey) {
+            return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+        }
+        return res.status(400).json({ error: "Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa. Vui lòng tạo API Key mới." });
+      }
+      if (errorMsg.includes("suspended") || errorMsg.includes("PERMISSION_DENIED") || error?.status === 403) {
+        if (!isCustomKey) {
+            return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+        }
+        return res.status(400).json({ error: "API Key cá nhân của bạn đã bị khóa (Suspended) bởi Google. Vui lòng vào Cài đặt đổi API Key khác." });
+      }
       if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
         return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
       }
@@ -255,7 +347,10 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế. Nếu không tìm th
         return res.status(400).json({ error: "Định dạng file không được AI hỗ trợ. Vui lòng chuyển file sang định dạng PDF và thử lại." });
       }
       if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
-        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
+        if (!isCustomKey) {
+            return res.status(429).json({ error: "Hệ thống AI hiện đang quá tải do có nhiều người sử dụng. Vui lòng vào Cài đặt hệ thống để điền API Key cá nhân của bạn để dùng riêng và không bị giới hạn." });
+        }
+        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc dùng API Key khác." });
       }
       if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
         return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
@@ -292,11 +387,29 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế. Nếu không tìm th
     } catch (error: any) {
       console.error("AI Generation error:", error);
       const errorMsg = error?.message || "";
+
+
+      const isCustomKey = !!req.headers['x-gemini-api-key'];
+      if (errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("service account is deleted") || error?.status === 401) {
+        if (!isCustomKey) {
+            return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+        }
+        return res.status(400).json({ error: "Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa. Vui lòng tạo API Key mới." });
+      }
+      if (errorMsg.includes("suspended") || errorMsg.includes("PERMISSION_DENIED") || error?.status === 403) {
+        if (!isCustomKey) {
+            return res.status(400).json({ error: "Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Để tiếp tục sử dụng ngay lập tức mà không bị gián đoạn, bạn hãy nhấp vào mục Cài đặt hệ thống (ở góc trái bên dưới) và nhập API Key cá nhân của mình nhé." });
+        }
+        return res.status(400).json({ error: "API Key cá nhân của bạn đã bị khóa (Suspended) bởi Google. Vui lòng vào Cài đặt đổi API Key khác." });
+      }
       if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
         return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
       }
       if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
-        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
+        if (!isCustomKey) {
+            return res.status(429).json({ error: "Hệ thống AI hiện đang quá tải do có nhiều người sử dụng. Vui lòng vào Cài đặt hệ thống để điền API Key cá nhân của bạn để dùng riêng và không bị giới hạn." });
+        }
+        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc dùng API Key khác." });
       }
       if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
         return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
@@ -355,8 +468,8 @@ LƯU Ý ĐỐI VỚI CÔNG THỨC: BẮT BUỘC sử dụng chuẩn LaTeX cho M�
       
       res.json({ result: response.text });
     } catch (error: any) {
-      console.error("Error generating similar exercise:", error);
-      res.status(500).json({ error: error.message || "Failed to generate similar exercise" });
+      console.error(error);
+      return handleAiError(error, req, res);
     }
   });
 
@@ -407,8 +520,8 @@ YÊU CẦU NGHIÊM NGẶT:
       
       res.json({ result: response.text });
     } catch (error: any) {
-      console.error("Error converting pdf to word:", error);
-      res.status(500).json({ error: error.message || "Failed to convert document" });
+      console.error(error);
+      return handleAiError(error, req, res);
     }
   });
 
@@ -456,8 +569,8 @@ YÊU CẦU:
       });
       res.json({ result: response.text });
     } catch (error: any) {
-      console.error("AI Solve Exercise error:", error);
-      res.status(500).json({ error: "Lỗi trong quá trình giải bài tập: " + (error?.message || "Lỗi không xác định") });
+      console.error(error);
+      return handleAiError(error, req, res);
     }
   });
 
@@ -573,9 +686,9 @@ Trả về danh sách các tiết học/lịch công tác.`;
       }
       
       res.json(parsed);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      res.status(500).json({ error: error.message || "Failed to extract data" });
+      return handleAiError(error, req, res);
     }
   });
 
@@ -685,9 +798,9 @@ Chú ý: Nội dung câu hỏi KHÔNG BAO GỒM các tiền tố như "Câu 1:".
       }
       
       res.json(parsed);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      res.status(500).json({ error: error.message || "Failed to generate exam" });
+      return handleAiError(error, req, res);
     }
   });
 

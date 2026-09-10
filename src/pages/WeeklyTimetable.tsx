@@ -91,7 +91,7 @@ export function WeeklyTimetable() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-gemini-api-key": key
+            "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
           },
           body: JSON.stringify({ file: base64, type: "timetable" })
         });

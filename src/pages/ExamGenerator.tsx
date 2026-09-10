@@ -231,7 +231,7 @@ ${customPrompt}
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-gemini-api-key": apiKey
+          "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
         },
         body: JSON.stringify({ 
           subject, grade, duration, examType, matrix, customPrompt: finalPrompt,
