@@ -175,6 +175,18 @@ const [examName, setExamName] = useState("");
   const [numCodes, setNumCodes] = useState(4);
   const [shareLink, setShareLink] = useState("");
 
+  const applyPresetBGD3Phan = () => {
+    setQEnabled({ mc: true, tf: true, sa: true, essay: false });
+    setQCounts({ mc: 12, tf: 4, sa: 6, essay: 0 });
+    setQPoints({ mc: 0.25, tf: 1, sa: 0.5, essay: 2 });
+  };
+
+  const applyPreset4Phan = () => {
+    setQEnabled({ mc: true, tf: true, sa: true, essay: true });
+    setQCounts({ mc: 12, tf: 2, sa: 4, essay: 3 });
+    setQPoints({ mc: 0.25, tf: 1, sa: 0.5, essay: 1 });
+  };
+
   const handleGenerate = async () => {
     if (generateMode === "from_matrix_file" && !matrixBase64) {
       alert("Bạn đã chọn 'Bám sát Ma trận đính kèm' nhưng chưa tải file lên. Vui lòng tải file ma trận lên trước.");
@@ -500,9 +512,16 @@ ${customPrompt}
 
                 {/* 3. CẤU TRÚC ĐỀ */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                  <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
-                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">3</span> CẤU TRÚC ĐỀ
+                  <h3 className="font-bold text-slate-800 flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">3</span> CẤU TRÚC ĐỀ
+                    </div>
                   </h3>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                     <span className="text-xs font-medium text-slate-500 flex items-center mr-1">Gợi ý nhanh:</span>
+                     <button onClick={applyPresetBGD3Phan} className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-md text-sm hover:bg-blue-100 transition-colors">Chuẩn BGD 3 phần (12 TN, 4 ĐS, 6 TLN)</button>
+                     <button onClick={applyPreset4Phan} className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-md text-sm hover:bg-emerald-100 transition-colors">Đề 4 phần (có Tự luận)</button>
+                  </div>
                   <div className="space-y-3">
                     <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 items-center">
                       <div className="col-span-5 text-left pl-2">Đang cấu hình</div>

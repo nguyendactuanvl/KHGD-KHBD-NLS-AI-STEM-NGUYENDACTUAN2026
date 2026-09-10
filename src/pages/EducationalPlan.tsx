@@ -94,7 +94,7 @@ export function EducationalPlan() {
         },
         body: JSON.stringify({
           subject,
-          grade: "10, 11, 12",
+          grade: selectedGrade.toString(),
           topic,
           files: uploadedFiles
         }),
@@ -124,7 +124,7 @@ export function EducationalPlan() {
       if (data && Array.isArray(data) && data.length > 0) {
         const newPlans = data.map((item: any, index: number) => ({
           id: Date.now().toString() + index,
-          grade: 10,
+          grade: selectedGrade,
           stt: plans.length + index + 1,
           lesson: item.lesson,
           periods: item.periods,
@@ -319,7 +319,7 @@ export function EducationalPlan() {
               onClick={() => {
                 setPlans([...plans, {
                   id: Date.now().toString(),
-                  grade: 10,
+                  grade: selectedGrade,
                   stt: plans.length + 1,
                   lesson: "",
                   periods: 1,

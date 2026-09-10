@@ -27,6 +27,8 @@ export function Worksheets() {
 
   const subjects = ["Toán", "Vật lý", "Hóa học", "Sinh học", "Ngữ văn", "Tiếng Anh", "Lịch sử", "Địa lý", "Giáo dục Kinh tế và Pháp luật", "Tin học", "Công nghệ"];
   const worksheetTypes = [
+    "Đề 3 phần (12 câu TN nhiều lựa chọn; 4 câu Đ/S; 6 câu TL ngắn)",
+    "Đề 4 phần (12 câu TN; 2 câu Đ/S; 4 câu TL ngắn; 3 câu Tự luận)",
     "Kết hợp trắc nghiệm và tự luận",
     "Chỉ trắc nghiệm khách quan",
     "Chỉ tự luận",
@@ -280,22 +282,15 @@ export function Worksheets() {
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Khối lớp
               </label>
-              <div className="flex bg-slate-100 p-1 rounded-lg">
-                {[10, 11, 12].map((grade) => (
-                  <button
-                    key={grade}
-                    onClick={() => setSelectedGrade(grade)}
-                    className={cn(
-                      "flex-1 py-1.5 text-sm font-medium rounded-md transition-colors",
-                      selectedGrade === grade
-                        ? "bg-white text-emerald-700 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    )}
-                  >
-                    Lớp {grade}
-                  </button>
+              <select 
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                value={selectedGrade}
+                onChange={(e) => setSelectedGrade(Number(e.target.value))}
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(g => (
+                  <option key={g} value={g}>Lớp {g}</option>
                 ))}
-              </div>
+              </select>
             </div>
 
             <div>
