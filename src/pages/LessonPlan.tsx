@@ -1,3 +1,4 @@
+import { exportHtmlToWord } from '../lib/exportUtils';
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Save, BookOpen, Download, AlertCircle, Upload, Edit3, Eye, Presentation } from "lucide-react";
 import pptxgen from "pptxgenjs";
@@ -115,7 +116,6 @@ export function LessonPlan() {
         payload = {
           lesson: customLessonName,
           subject: subject,
-          textbook: selectedTextbook?.name || "Kết nối tri thức với cuộc sống",
           files: uploadedFiles
         };
       }
@@ -157,7 +157,6 @@ export function LessonPlan() {
         type: "KHBD",
         grade: activeTab === "system" && selectedLesson ? selectedLesson.grade : 0,
         subject: subject,
-          textbook: selectedTextbook?.name || "Kết nối tri thức với cuộc sống",
         lessonName: activeTab === "system" && selectedLesson ? selectedLesson.lesson : customLessonName,
         content: data.result
       });
@@ -246,71 +245,7 @@ export function LessonPlan() {
       }
       return;
     }
-    
-    // Clone to manipulate the DOM for Word compatibility
-    const clone = exportRef.current.cloneNode(true) as HTMLElement;
-    
-    // Extract MathML from KaTeX for native Word Equation support
-    const katexElements = clone.querySelectorAll('.katex');
-    katexElements.forEach(el => {
-      const mathNode = el.querySelector('.katex-mathml math');
-      if (mathNode) {
-        const mathClone = mathNode.cloneNode(true) as Element;
-        
-        // Remove annotation tags completely
-        const annotations = mathClone.querySelectorAll('annotation');
-        annotations.forEach(a => a.remove());
-        
-        // Remove semantics tag but keep its children to avoid Word confusion
-        const semantics = mathClone.querySelector('semantics');
-        if (semantics) {
-           while (semantics.firstChild) {
-               mathClone.insertBefore(semantics.firstChild, semantics);
-           }
-           semantics.remove();
-        }
-        
-        el.parentNode?.replaceChild(mathClone, el);
-      }
-    });
-
-    const contentHtml = clone.innerHTML;
-    
-    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'>
-    <head>
-      <meta charset='utf-8'>
-      <title>Giáo án</title>
-      <style>
-        body { font-family: 'Times New Roman', Times, serif; font-size: 13pt; }
-        table { border-collapse: collapse; width: 100%; margin: 15pt 0; }
-        th, td { border: 1px solid black; padding: 6pt; text-align: left; vertical-align: top; }
-        th { background-color: #f3f4f6; font-weight: bold; }
-        img { max-width: 100%; height: auto; display: block; margin: 15pt auto; text-align: center; }
-        h1, h2, h3, h4, h5, h6 { color: #1e293b; margin-top: 15pt; margin-bottom: 5pt; }
-        h2 { font-size: 16pt; }
-        h3 { font-size: 14pt; }
-        p, li { font-size: 13pt; line-height: 1.5; margin-bottom: 8pt; }
-        a { color: #059669; text-decoration: none; }
-      </style>
-    </head><body>`;
-    const footer = "</body></html>";
-    
-    const html = header + contentHtml + footer;
-    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
-    const url = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(html);
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    
-    let downloadName = 'Giao_an.doc';
-    if (activeTab === "system") {
-      downloadName = `Giao_an_${selectedLesson?.lesson ? selectedLesson.lesson.substring(0,30) : 'bai_hoc'}.doc`;
-    } else {
-      downloadName = `Giao_an_${customLessonName ? customLessonName.substring(0,30) : 'bai_hoc'}.doc`;
-    }
-    link.download = downloadName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportHtmlToWord(exportRef.current, `GiaoAn_${(activeTab === 'system' && selectedLesson ? selectedLesson.lesson : customLessonName).replace(/\s+/g, '_')}.doc`);
   };
 
   return (

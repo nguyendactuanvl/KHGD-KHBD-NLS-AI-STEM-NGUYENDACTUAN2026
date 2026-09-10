@@ -1,3 +1,4 @@
+import { exportHtmlToWord } from "../lib/exportUtils";
 import { useState, useRef } from "react";
 import { Sparkles, Save, BookOpen, Download, AlertCircle, Edit3, Eye } from "lucide-react";
 import Markdown from "react-markdown";
@@ -178,73 +179,23 @@ export function Worksheets() {
   };
 
   const handleExportWord = () => {
-    if (!suggestion || !exportRef.current) {
-      if (isEditing) {
+    if (isEditing) {
+      if (window.confirm("Bạn đang ở chế độ chỉnh sửa (hiển thị mã Markdown). Bạn có muốn chuyển sang chế độ Xem trước để xuất file đẹp hơn không?")) {
+        setIsEditing(false);
+        setTimeout(() => {
+          if (exportRef.current) {
+            exportHtmlToWord(exportRef.current, `PhieuHocTap_${customLessonName.replace(/\s+/g, '_')}.doc`);
+          }
+        }, 500);
+      } else {
         alert("Vui lòng chuyển sang chế độ 'Xem trước' (con mắt) trước khi tải xuống.");
       }
       return;
     }
 
-    const clone = exportRef.current.cloneNode(true) as HTMLElement;
-    
-    // Extract MathML from KaTeX for native Word Equation support
-    const katexElements = clone.querySelectorAll('.katex');
-    katexElements.forEach(el => {
-      const mathNode = el.querySelector('.katex-mathml math');
-      if (mathNode) {
-        const mathClone = mathNode.cloneNode(true) as Element;
-        
-        // Remove annotation tags completely
-        const annotations = mathClone.querySelectorAll('annotation');
-        annotations.forEach(a => a.remove());
-        
-        // Remove semantics tag but keep its children to avoid Word confusion
-        const semantics = mathClone.querySelector('semantics');
-        if (semantics) {
-           while (semantics.firstChild) {
-               mathClone.insertBefore(semantics.firstChild, semantics);
-           }
-           semantics.remove();
-        }
-        
-        el.parentNode?.replaceChild(mathClone, el);
-      }
-    });
-
-    const htmlContent = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.openxmlformats.org/officeDocument/2006/math' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head>
-        <meta charset='utf-8'>
-        <title>Export HTML To Doc</title>
-        <style>
-          body { font-family: 'Times New Roman', serif; font-size: 13pt; line-height: 1.5; }
-          h1 { font-size: 18pt; text-align: center; margin-bottom: 20px; }
-          h2 { font-size: 16pt; margin-top: 20px; }
-          h3 { font-size: 14pt; margin-top: 15px; }
-          table { border-collapse: collapse; width: 100%; margin: 15px 0; }
-          th, td { border: 1px solid black; padding: 8px; }
-          .katex-html { display: none; }
-          .katex-mathml { display: block; font-family: "Cambria Math", serif; }
-          .katex { font-family: 'Cambria Math', serif; } /* Attempt fallback for math in Word */
-        </style>
-      </head>
-      <body>
-        ${clone.innerHTML}
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob(['\ufeff', htmlContent], {
-      type: 'application/msword'
-    });
-    
-    const url = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(htmlContent);
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `PhieuHocTap_${customLessonName.replace(/\s+/g, '_')}.doc`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (exportRef.current) {
+      exportHtmlToWord(exportRef.current, `PhieuHocTap_${customLessonName.replace(/\s+/g, '_')}.doc`);
+    }
   };
 
   return (

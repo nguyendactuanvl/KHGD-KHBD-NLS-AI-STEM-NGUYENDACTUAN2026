@@ -1,3 +1,4 @@
+import { exportHtmlToWord } from '../lib/exportUtils';
 import { useState, useEffect, useRef } from "react";
 import { getHistory, deleteFromHistory, clearHistory } from "../lib/history";
 import { HistoryItem } from "../types";

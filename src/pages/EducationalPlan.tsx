@@ -1,3 +1,4 @@
+import { exportHtmlToWord } from '../lib/exportUtils';
 import React, { useState, useRef } from "react";
 import { KHGDRow } from "../types";
 import { fullPlan } from "../data/mockData";
@@ -9,6 +10,7 @@ import { printElement } from '../lib/print';
 export function EducationalPlan() {
   const [plans, setPlans] = useState<KHGDRow[]>(fullPlan);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedGrade, setSelectedGrade] = useState<number>(10);
   const exportRef = useRef<HTMLDivElement>(null);
   const [subject, setSubject] = useState("Toán");
   

@@ -4,6 +4,7 @@ import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { exportHtmlToWord } from '../lib/exportUtils';
 import { useState, useRef, useEffect } from "react";
 import { FileCheck, Sparkles, Shuffle, Download, Share2, Plus, Trash2, Printer } from "lucide-react";
 
@@ -289,24 +290,7 @@ ${customPrompt}
   const handleExportWord = (contentId: string, code: string) => {
     const printContent = document.getElementById(contentId);
     if (!printContent) return;
-    
-    const html = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'><title>Export HTML To Doc</title></head><body>
-      ${printContent.innerHTML}
-      </body></html>
-    `;
-
-    const blob = new Blob(['\ufeff', html], {
-      type: 'application/msword'
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `De_kiem_tra_Ma_${code}.doc`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportHtmlToWord(printContent, `De_kiem_tra_Ma_${code}.doc`);
   };
 
   const handlePrint = (contentId: string) => {
@@ -744,18 +728,9 @@ ${customPrompt}
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => {
-                                const html = document.getElementById('matrix-table-wrap')?.innerHTML;
-                                if (!html) return;
-                                const preHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Ma Tran</title><style>table { border-collapse: collapse; width: 100%; font-family: "Times New Roman", Times, serif; font-size: 11pt; } th, td { border: 1px solid black; padding: 4px; text-align: center; } th { font-weight: bold; }</style></head><body><div style="text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 20px;">MA TRẬN ĐỀ KIỂM TRA ĐỊNH KÌ</div>`;
-                                const postHtml = "</body></html>";
-                                const blob = new Blob(['\ufeff', preHtml + html + postHtml], { type: 'application/msword' });
-                                const url = URL.createObjectURL(blob);
-                                const link = document.createElement('a');
-                                link.href = url;
-                                link.download = 'Ma_Tran_De_Kiem_Tra.doc';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
+                                const wrap = document.getElementById('matrix-table-wrap');
+                                if (!wrap) return;
+                                exportHtmlToWord(wrap, 'Ma_Tran_De_Kiem_Tra.doc');
                             }} className="px-3 py-1.5 bg-blue-50 text-blue-600 font-medium rounded hover:bg-blue-100 flex items-center gap-2 text-sm border border-blue-200 no-print">
                               Xuất Word
                             </button>

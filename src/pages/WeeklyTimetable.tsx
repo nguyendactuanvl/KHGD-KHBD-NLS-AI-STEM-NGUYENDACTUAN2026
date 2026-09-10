@@ -119,7 +119,7 @@ export function WeeklyTimetable() {
     reader.readAsDataURL(file);
   };
 
-  const updateTimetable = (day: string, period: number, val: string) => {
+  const updateTimetable = (day: string, period: number | string, val: string) => {
     saveTimetable({ ...timetable, [`${day}-${period}`]: val });
   };
 

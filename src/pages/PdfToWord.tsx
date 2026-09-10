@@ -1,3 +1,4 @@
+import { exportHtmlToWord } from '../lib/exportUtils';
 import React, { useState, useRef } from 'react';
 import { Upload, X, FileText, Loader2, Download, AlertCircle } from 'lucide-react';
 import Markdown from 'react-markdown';

@@ -277,7 +277,7 @@ export function Gamification() {
     frame();
   };
 
-  useEffect(() => {
+   
     
   const askAi = async () => {
     if (!aiQuery.trim()) return;
@@ -308,10 +308,7 @@ export function Gamification() {
     }
   };
 
-  return () => {
-      if (spinInterval.current) clearTimeout(spinInterval.current);
-    };
-  }, []);
+
 
   // --- RANKING LOGIC ---
   const getFilteredScores = () => {

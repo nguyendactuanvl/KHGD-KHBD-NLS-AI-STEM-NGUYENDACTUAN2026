@@ -1,5 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { Copy,  Save,  Upload, X, Sparkles, Loader2, Download, Presentation, ChevronLeft, ChevronRight, Maximize2   } from 'lucide-react';
+import { Copy, Save, Upload, X, Sparkles, Loader2, Download, Presentation, ChevronLeft, ChevronRight, Maximize2, FileText, BookmarkPlus, Camera, Image as ImageIcon, Send, ArrowLeft } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -294,7 +293,7 @@ const handleSolve = async () => {
                     </button>
                     <button 
                       className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-sm"
-                      onClick={(e) => { e.stopPropagation(); handleSolveFromImage(); }}
+                      onClick={(e) => { e.stopPropagation(); handleSolve(); }}
                       disabled={isUploading}
                     >
                       {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}

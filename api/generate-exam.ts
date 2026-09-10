@@ -77,7 +77,7 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
     }
 
     const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    let parsedData = {};
+    let parsedData: any = {};
     try {
       parsedData = JSON.parse(rawOutput);
     } catch {
