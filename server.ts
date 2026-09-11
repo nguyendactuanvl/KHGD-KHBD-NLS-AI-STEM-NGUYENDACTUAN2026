@@ -61,38 +61,30 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 async function generateWithFallback(req: any, payloadOptions: any) {
   const client = getAiClient(req);
-  const models = ["gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-1.5-flash"];
-  const maxRetries = 3;
+  const models = ["gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-2.0-flash"];
+  let primaryError: any = null;
   
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    for (const model of models) {
-      try {
-        return await client.models.generateContent({ ...payloadOptions, model });
-      } catch (e: any) {
-        const errorMsg = e?.message || "";
-        const status = e?.status;
-        // Do not retry if quota is exhausted
-        if (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") || (status === 429 && !errorMsg.includes("rate limit"))) {
-             throw e; // Quota exhausted, throw immediately
-        }
-        if (
-          errorMsg.includes("429") || 
-          errorMsg.includes("503") || status === 503 || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded")
-        ) {
-          console.log(`Model ${model} failed on attempt ${attempt + 1}. Retrying...`);
-          continue; // Try next model or next attempt
-        }
-        if (errorMsg.includes("not found") || status === 404) {
-             continue; // Model might not exist, try next one
-        }
-        throw e; // Other errors (like 401, 400) throw immediately
+  for (const model of models) {
+    try {
+      return await client.models.generateContent({ ...payloadOptions, model });
+    } catch (e: any) {
+      const errorMsg = e?.message || "";
+      const status = e?.status;
+      
+      if (
+        errorMsg.includes("429") || status === 429 || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") ||
+        errorMsg.includes("503") || status === 503 || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded")
+      ) {
+        if (!primaryError) primaryError = e; // Keep the most relevant error
+        continue; // Try next model
       }
-    }
-    // If we exhausted all models in this attempt, wait before next attempt
-    if (attempt < maxRetries - 1) {
-      await delay(2000 * (attempt + 1));
+      if (errorMsg.includes("not found") || status === 404) {
+        continue; // Skip missing models
+      }
+      throw e; // Other errors (401, 400) throw immediately
     }
   }
+  if (primaryError) throw primaryError;
   throw new Error("503 UNAVAILABLE: Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (503). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân.");
 }
 
@@ -423,21 +415,11 @@ Văn phong cần chuyên nghiệp, sư phạm, thực tế. Nếu không tìm th
 
       res.json({ result: response.text });
     } catch (error: any) {
-      console.error("AI File Generation error:", error);
       const errorMsg = error?.message || "";
-      if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
-        return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
-      }
       if (errorMsg.includes("Unsupported MIME type")) {
         return res.status(400).json({ error: "Định dạng file không được AI hỗ trợ. Vui lòng chuyển file sang định dạng PDF và thử lại." });
       }
-      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
-        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
-      }
-      if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
-        return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
-      }
-      res.status(500).json({ error: "Failed to generate lesson plan from file" });
+      return handleAiError(error, req, res);
     }
 
 });
@@ -593,18 +575,7 @@ app.all("/api/generate-plan", async (req, res) => {
       const data = JSON.parse(response.text || "[]");
       res.json(data);
     } catch (error: any) {
-      console.error("AI Generation error:", error);
-      const errorMsg = error?.message || "";
-      if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
-        return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
-      }
-      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
-        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
-      }
-      if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
-        return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
-      }
-      res.status(500).json({ error: "Failed to generate plan" });
+      return handleAiError(error, req, res);
     }
 
 });
@@ -694,18 +665,7 @@ app.all("/api/generate-worksheet", async (req, res) => {
 
       res.json({ result: response.text });
     } catch (error: any) {
-      console.error("AI Generation error:", error);
-      const errorMsg = error?.message || "";
-      if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
-        return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
-      }
-      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
-        return res.status(429).json({ error: "API Key của bạn đã vượt quá giới hạn lượt dùng miễn phí (Quota exceeded). Vui lòng đợi khoảng 1 phút rồi thử lại, hoặc nâng cấp tài khoản." });
-      }
-      if (errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503) {
-        return res.status(503).json({ error: "Hệ thống AI của Google hiện đang quá tải (Server Overloaded). Vui lòng đợi 5-10 giây rồi bấm thử lại." });
-      }
-      res.status(500).json({ error: "Failed to generate worksheet" });
+      return handleAiError(error, req, res);
     }
 
 });
