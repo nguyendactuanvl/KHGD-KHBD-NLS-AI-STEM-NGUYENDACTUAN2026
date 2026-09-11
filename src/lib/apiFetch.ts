@@ -60,13 +60,13 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
         // 3. If the system key ALSO fails
         if (retryIsAuthError) {
             window.dispatchEvent(new CustomEvent('show-api-key-modal'));
-            throw new Error("Khóa API không khả dụng. Vui lòng bấm vào nút 'Nhập mã API key' ở cột menu bên trái để thiết lập khóa cá nhân miễn phí.");
+            throw new Error("Khóa API Hệ Thống không khả dụng. Vui lòng bấm vào Cài đặt ⚙️ ở menu bên trái để thiết lập mã API key cá nhân miễn phí.");
         }
       }
     } else if (isAuthError) {
         // We didn't have a custom key (meaning system key failed directly).
         window.dispatchEvent(new CustomEvent('show-api-key-modal'));
-        throw new Error("Khóa API hiện tại không khả dụng. Vui lòng bấm vào nút 'Nhập mã API key' ở cột menu bên trái để thiết lập khóa cá nhân miễn phí.");
+        throw new Error("Khóa API Hệ Thống không khả dụng. Vui lòng bấm vào Cài đặt ⚙️ ở menu bên trái để thiết lập mã API key cá nhân miễn phí.");
     }
   }
 

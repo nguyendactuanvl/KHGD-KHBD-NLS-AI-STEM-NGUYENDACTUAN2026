@@ -28,7 +28,7 @@ function handleAiError(error: any, req: any, res: any) {
   }
   if (errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("service account is deleted") || error?.status === 401 || errorMsg.includes("ACCOUNT_STATE_INVALID")) {
     if (!isCustomKey) {
-        return res.status(401).json({ error: "UNAUTHENTICATED: Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch." });
+        return res.status(401).json({ error: "UNAUTHENTICATED: Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Vui lòng thiết lập API Key cá nhân trong phần Cài đặt." });
     }
     return res.status(401).json({ error: "UNAUTHENTICATED: Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa hoặc không hợp lệ." });
   }
@@ -364,6 +364,7 @@ app.all("/api/generate-lesson-plan-file", async (req, res) => {
       
       const prompt = `Bạn là một giáo viên xuất sắc và chuyên gia giáo dục. Tôi đã tải lên một tài liệu Kế hoạch giáo dục (KHGD).
 Dựa vào các tài liệu được cung cấp (Sách, Văn bản, KHDH...), hãy soạn chi tiết một Kế hoạch bài dạy (Giáo án) môn ${subject || "chung"} theo chuẩn Công văn 5512/BGDĐT-GDTrH cho bài học: "${lesson}".
+TUYỆT ĐỐI BÁM SÁT VÀ SOẠN CHÍNH XÁC BÀI HỌC CÓ TÊN LÀ: "${lesson}". KHÔNG ĐƯỢC TỰ Ý ĐỔI SANG BÀI KHÁC.
 Đặc biệt lưu ý: Vui lòng sử dụng và bám sát nội dung, thuật ngữ, tiến trình của bộ sách giáo khoa: "${textbookName}".
 Trích xuất các thông tin về:
 - Số tiết (phân bổ thời gian cho bài học này)
@@ -452,6 +453,7 @@ app.all("/api/generate-lesson-plan", async (req, res) => {
 
     // Xây dựng System Prompt chi tiết theo đúng cấu trúc CV 5512 & GDPT 2018
     const promptText = body.customPrompt || `Bạn là chuyên gia sư phạm môn ${subject} chương trình GDPT 2018. Hãy soạn một Kế hoạch bài dạy (Giáo án) chi tiết, chỉn chu, đúng chuẩn Công văn 5512/BGDĐT-GDTrH.
+TUYỆT ĐỐI BÁM SÁT VÀ SOẠN CHÍNH XÁC BÀI HỌC CÓ TÊN LÀ: "${topic}". KHÔNG ĐƯỢC ĐỔI SANG BÀI KHÁC HOẶC TỰ Ý THÊM BỚT NỘI DUNG NGOÀI CHỦ ĐỀ NÀY. CHÚ Ý KỸ YÊU CẦU CẦN ĐẠT CỦA BÀI NÀY LÀ GÌ ĐỂ TRÁNH LẠC ĐỀ.
 Đặc biệt lưu ý: Vui lòng sử dụng và bám sát nội dung, thuật ngữ, tiến trình của bộ sách giáo khoa: "${textbook}".
 Các thông tin cốt lõi của bài học:
 - Tên bài: ${topic}
