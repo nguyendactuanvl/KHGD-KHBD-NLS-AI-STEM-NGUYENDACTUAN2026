@@ -8,7 +8,11 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  let customKey = req.headers['x-gemini-api-key'];
+  if (customKey) {
+    try { customKey = decodeURIComponent(customKey); } catch (e) {}
+  }
+  const apiKey = customKey || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: 'Thiếu biến GEMINI_API_KEY trên Vercel' });
   }
@@ -73,7 +77,17 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
 
     const data = await response.json();
     if (!response.ok) {
-      return res.status(500).json({ error: data.error?.message || 'Lỗi Google API' });
+      const errorMsg = typeof data.error?.message === 'string' ? data.error.message : JSON.stringify(data.error || 'Lỗi từ Google API');
+      const isAuthError = errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("deleted") || errorMsg.includes("disabled") || errorMsg.includes("ACCOUNT_STATE_INVALID");
+      const isOverload = errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") || errorMsg.includes("429") || response.status === 429 || errorMsg.includes("503") || response.status === 503 || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("high demand") || errorMsg.includes("High demand");
+      
+      if (isAuthError) {
+        return res.status(401).json({ error: "UNAUTHENTICATED: Tài khoản API Key của bạn không hợp lệ hoặc đã bị khóa." });
+      }
+      if (isOverload) {
+        return res.status(429).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao. Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
+      }
+      return res.status(500).json({ error: errorMsg });
     }
 
     const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';

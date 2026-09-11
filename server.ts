@@ -19,17 +19,43 @@ function getAiClient(req: any) {
   return new GoogleGenAI({ apiKey: apiKey.replace(/[^\x20-\x7E]/g, '').trim() });
 }
 
+function handleAiError(error: any, req: any, res: any) {
+  const errorMsg = error?.message || "";
+  const isCustomKey = !!req.headers['x-gemini-api-key'];
+
+  if (errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("service account is deleted") || error?.status === 401 || errorMsg.includes("ACCOUNT_STATE_INVALID")) {
+    if (!isCustomKey) {
+        return res.status(401).json({ error: "UNAUTHENTICATED: Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch." });
+    }
+    return res.status(401).json({ error: "UNAUTHENTICATED: Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa hoặc không hợp lệ." });
+  }
+
+  if (errorMsg.includes("suspended") || errorMsg.includes("PERMISSION_DENIED") || error?.status === 403) {
+    if (!isCustomKey) {
+        return res.status(401).json({ error: "UNAUTHENTICATED: Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch." });
+    }
+    return res.status(401).json({ error: "UNAUTHENTICATED: Tài khoản API Key cá nhân của bạn đã bị từ chối quyền truy cập." });
+  }
+
+  if (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") || errorMsg.includes("429") || error?.status === 429 || errorMsg.includes("503") || error?.status === 503 || errorMsg.includes("UNAVAILABLE")) {
+    return res.status(429).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (503). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
+  }
+
+  console.error("Unhandled AI Error:", error);
+  res.status(500).json({ error: errorMsg || "Đã xảy ra lỗi không xác định từ máy chủ AI. Vui lòng thử lại sau." });
+}
+
 async function generateWithFallback(req: any, payloadOptions: any) {
   const client = getAiClient(req);
   for (const model of ["gemini-3.6-flash", "gemini-3.1-pro-preview"]) {
     try {
       return await client.models.generateContent({ ...payloadOptions, model });
     } catch (e: any) {
-      if (e?.message?.includes("429") || e?.message?.includes("quota") || e?.status === 429) continue;
+      if (e?.message?.includes("429") || e?.message?.includes("quota") || e?.status === 429 || e?.message?.includes("503") || e?.status === 503 || e?.message?.includes("UNAVAILABLE")) continue;
       throw e;
     }
   }
-  throw new Error("All models failed");
+  throw new Error("429 RESOURCE_EXHAUSTED All models failed");
 }
 
 app.all("/api/circulars", async (req, res) => {
@@ -153,11 +179,9 @@ Trả về danh sách các tiết học/lịch công tác.`;
       }
       
       res.json(parsed);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message || "Failed to extract data" });
-    }
-
+    } catch (error: any) {
+    return handleAiError(error, req, res);
+  }
 });
 
 app.all("/api/generate-exam", async (req, res) => {
@@ -169,10 +193,7 @@ app.all("/api/generate-exam", async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'Thiếu biến GEMINI_API_KEY trên Vercel' });
-  }
+  
 
   try {
     const body = req.body || {};
@@ -221,23 +242,15 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
   ]
 }`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }],
-        generationConfig: {
+    
+    const response = await generateWithFallback(req, {
+      contents: [{ parts: [{ text: promptText }] }]
+      , config: {
           responseMimeType: "application/json"
         }
-      })
     });
-
-    const data = await response.json();
-    if (!response.ok) {
-      return res.status(500).json({ error: data.error?.message || 'Lỗi Google API' });
-    }
-
-    const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    const rawOutput = response.text || '';
+  
     let parsedData: any = {};
     try {
       parsedData = JSON.parse(rawOutput);
@@ -289,10 +302,9 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
       exam: { ...parsedData, questions: formattedQuestions },
       result: { ...parsedData, questions: formattedQuestions }
     });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+  } catch (err: any) {
+    return handleAiError(err, req, res);
   }
-
 });
 
 app.all("/api/generate-lesson-plan-file", async (req, res) => {
@@ -386,10 +398,7 @@ app.all("/api/generate-lesson-plan", async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'Thiếu biến GEMINI_API_KEY trên Vercel' });
-  }
+  
 
   try {
     const body = req.body || {};
@@ -444,21 +453,13 @@ d) Tổ chức thực hiện:
 
 Định dạng văn bản rõ ràng, phân cấp khoa học bằng Markdown, công thức Toán học dùng ký hiệu chuẩn TeX.`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }]
-      })
+    
+    const response = await generateWithFallback(req, {
+      contents: [{ parts: [{ text: promptText }] }]
+      
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(500).json({ error: data.error?.message || 'Lỗi từ Google API' });
-    }
-
-    const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const outputText = response.text || '';
+    
 
     return res.status(200).json({
       success: true,
@@ -467,10 +468,9 @@ d) Tổ chức thực hiện:
       plan: outputText,
       content: outputText
     });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+  } catch (err: any) {
+    return handleAiError(err, req, res);
   }
-
 });
 
 app.all("/api/generate-plan", async (req, res) => {
@@ -605,10 +605,8 @@ LƯU Ý ĐỐI VỚI CÔNG THỨC: BẮT BUỘC sử dụng chuẩn LaTeX cho M�
       
       res.json({ result: response.text });
     } catch (error: any) {
-      console.error("Error generating similar exercise:", error);
-      res.status(500).json({ error: error.message || "Failed to generate similar exercise" });
-    }
-
+    return handleAiError(error, req, res);
+  }
 });
 
 app.all("/api/generate-worksheet", async (req, res) => {
@@ -708,10 +706,8 @@ YÊU CẦU NGHIÊM NGẶT:
       
       res.json({ result: response.text });
     } catch (error: any) {
-      console.error("Error converting pdf to word:", error);
-      res.status(500).json({ error: error.message || "Failed to convert document" });
-    }
-
+    return handleAiError(error, req, res);
+  }
 });
 
 app.all("/api/solve-exercise", async (req, res) => {
@@ -775,19 +771,36 @@ app.get("/api/exams/:id", (req, res) => {
   else res.status(404).json({ error: "Exam not found" });
 });
 
+// Adding back chat route
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { prompt, context } = req.body;
+    let fullPrompt = prompt;
+    if (context) {
+      fullPrompt = `Ngữ cảnh: ${JSON.stringify(context)}\n\nCâu hỏi: ${prompt}`;
+    }
+    const response = await generateWithFallback(req, {
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }]
+    });
+    res.json({ text: response.text });
+  } catch (error: any) {
+    return handleAiError(error, req, res);
+  }
+});
+
 if (!process.env.VERCEL) {
   const PORT = 3000;
   if (process.env.NODE_ENV !== "production") {
     import("vite").then(async ({ createServer }) => {
       const vite = await createServer({ server: { middlewareMode: true }, appType: "spa" });
       app.use(vite.middlewares);
-      app.listen(PORT, "0.0.0.0", () => console.log("Server running"));
+      app.listen(PORT, "0.0.0.0", () => console.log("Server running on port " + PORT));
     });
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*all", (req, res) => res.sendFile(path.join(distPath, "index.html")));
-    app.listen(PORT, "0.0.0.0", () => console.log("Server running"));
+    app.listen(PORT, "0.0.0.0", () => console.log("Server running on port " + PORT));
   }
 }
 export default app;
