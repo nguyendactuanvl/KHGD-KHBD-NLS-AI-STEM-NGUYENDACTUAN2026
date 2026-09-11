@@ -243,12 +243,27 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
 }`;
 
     
-    const response = await generateWithFallback(req, {
-      contents: [{ parts: [{ text: promptText }] }]
-      , config: {
-          responseMimeType: "application/json"
+    
+    const parts: any[] = [{ text: promptText }];
+    if (body.matrixFile) {
+        const matches = body.matrixFile.match(/^data:(.*?);base64,(.*)$/);
+        if (matches && matches.length === 3) {
+            parts.push({
+                inlineData: {
+                    mimeType: matches[1],
+                    data: matches[2]
+                }
+            });
         }
+    }
+
+    const response = await generateWithFallback(req, {
+      contents: [{ parts }],
+      config: {
+          responseMimeType: "application/json"
+      }
     });
+
     const rawOutput = response.text || '';
   
     let parsedData: any = {};

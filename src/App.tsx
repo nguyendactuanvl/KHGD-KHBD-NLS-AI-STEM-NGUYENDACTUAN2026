@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Menu, Sparkles } from "lucide-react";
+import { Menu, Sparkles, Key } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { EducationalPlan } from "./pages/EducationalPlan";
@@ -72,11 +72,18 @@ export default function App() {
         <header className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 shrink-0 shadow-sm z-10 relative">
           <div className="flex items-center gap-2 text-emerald-600">
              <Sparkles className="h-6 w-6" />
-             <span className="font-bold text-lg">EduPlan AI</span>
+             <span className="font-bold text-lg hidden sm:inline">EduPlan AI</span>
+             <span className="font-bold text-lg sm:hidden">EduPlan</span>
           </div>
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-md">
-            <Menu className="h-6 w-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-md text-xs font-medium hover:bg-emerald-100 transition-colors">
+              <Key className="h-3.5 w-3.5" />
+              <span>API Key</span>
+            </button>
+            <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-md">
+              <Menu className="h-6 w-6" />
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto relative w-full h-full">

@@ -7,7 +7,7 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { exportHtmlToWord } from '../lib/exportUtils';
 import { useState, useRef, useEffect } from "react";
-import { FileCheck, Sparkles, Shuffle, Download, Share2, Plus, Trash2, Printer } from "lucide-react";
+import { FileCheck, Sparkles, Shuffle, Download, Share2, Plus, Trash2, Printer, UploadCloud } from "lucide-react";
 
 interface Question {
   type?: "mc" | "tf" | "sa" | "essay";
@@ -41,6 +41,44 @@ interface MatrixConfig {
   timestamp: number;
 }
 
+
+const MultiPointInput = ({ count, value, onChange, disabled }: { count: number, value: string, onChange: (val: string) => void, disabled: boolean }) => {
+  const points = value.split(',').map(s => s.trim()).filter(s => s !== '');
+  if (points.length === 0) points.push("1");
+  
+  // Create an array of length `count`
+  const currentPoints = [];
+  for (let i = 0; i < count; i++) {
+    currentPoints.push(points[i] !== undefined ? points[i] : (points[points.length - 1] || "1"));
+  }
+
+  if (count > 0 && count <= 6) {
+    return (
+      <div className="flex flex-wrap gap-1 justify-center">
+        {currentPoints.map((pt, i) => (
+          <input 
+            key={i}
+            type="text"
+            className="w-10 text-center border border-slate-300 rounded py-1 text-xs focus:ring-1 focus:ring-blue-500"
+            value={pt}
+            disabled={disabled}
+            onChange={e => {
+              const newPoints = [...currentPoints];
+              newPoints[i] = e.target.value;
+              onChange(newPoints.join(', '));
+            }}
+            title={`Điểm câu ${i+1}`}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <input type="text" value={value} onChange={e=>onChange(e.target.value)} disabled={disabled} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" placeholder="VD: 0.5 hoặc 0.75, 1.0" title="Nhập điểm số (vd: 0.5) hoặc chuỗi (vd: 0.75, 1.0) cho các câu hỏi" />
+  );
+};
+
 export function ExamGenerator() {
   const [activeTab, setActiveTab] = useState<"matrix" | "exam" | "shuffle" | "banks">("matrix");
   const [subject, setSubject] = useState("Toán");
@@ -57,6 +95,7 @@ export function ExamGenerator() {
   const [qCounts, setQCounts] = useState({ mc: 20, tf: 0, sa: 0, essay: 0 });
   const [schoolLevel, setSchoolLevel] = useState("THCS");
   const [generateMode, setGenerateMode] = useState<"auto" | "from_matrix_file">("auto");
+  const [autoDetectStructure, setAutoDetectStructure] = useState(false);
   const [bankQuestions, setBankQuestions] = useState<Question[]>(() => {
     try {
       const saved = localStorage.getItem('question_banks');
@@ -80,7 +119,21 @@ export function ExamGenerator() {
   const [bankFilterTopic, setBankFilterTopic] = useState("");
   const [bankFilterLevel, setBankFilterLevel] = useState("");
 
-  const [qPoints, setQPoints] = useState({ mc: 0.25, tf: 0.5, sa: 0.5, essay: 2 });
+  const [qPoints, setQPoints] = useState({ mc: "0.25", tf: "0.5", sa: "0.5", essay: "2" });
+
+  const calculatePoints = (ptStr: string | number, count: number) => {
+    const str = String(ptStr).trim();
+    if (!str.includes(',')) {
+      const val = Number(str) || 0;
+      return { total: val * count, average: val };
+    }
+    const parts = str.split(',').map(s => Number(s.trim()) || 0);
+    let total = 0;
+    for (let i = 0; i < count; i++) {
+        total += parts[i] !== undefined ? parts[i] : (parts[parts.length-1] || 0);
+    }
+    return { total, average: count > 0 ? total / count : 0 };
+  };
   const [qEnabled, setQEnabled] = useState({ mc: true, tf: true, sa: true, essay: true });
   const [levels, setLevels] = useState({ nb: 40, th: 30, vd: 20, vdc: 10 });
   const [outputConfig, setOutputConfig] = useState({ answers: true, matrix: true, spec: true, shuffleQuestions: true, shuffleOptions: true, detailedSolution: true });
@@ -138,7 +191,11 @@ export function ExamGenerator() {
 
   
   const totalQuestionsCalc = (qEnabled.mc ? qCounts.mc : 0) + (qEnabled.tf ? qCounts.tf : 0) + (qEnabled.sa ? qCounts.sa : 0) + (qEnabled.essay ? qCounts.essay : 0);
-  const totalPointsCalc = (qEnabled.mc ? qCounts.mc * qPoints.mc : 0) + (qEnabled.tf ? qCounts.tf * qPoints.tf : 0) + (qEnabled.sa ? qCounts.sa * qPoints.sa : 0) + (qEnabled.essay ? qCounts.essay * qPoints.essay : 0);
+  const ptMC = calculatePoints(qPoints.mc, qCounts.mc);
+  const ptTF = calculatePoints(qPoints.tf, qCounts.tf);
+  const ptSA = calculatePoints(qPoints.sa, qCounts.sa);
+  const ptES = calculatePoints(qPoints.essay, qCounts.essay);
+  const totalPointsCalc = (qEnabled.mc ? ptMC.total : 0) + (qEnabled.tf ? ptTF.total : 0) + (qEnabled.sa ? ptSA.total : 0) + (qEnabled.essay ? ptES.total : 0);
 
   const [matrixFile, setMatrixFile] = useState<File | null>(null);
   const [matrixBase64, setMatrixBase64] = useState<string | null>(null);
@@ -180,13 +237,21 @@ const [examName, setExamName] = useState("");
   const applyPresetBGD3Phan = () => {
     setQEnabled({ mc: true, tf: true, sa: true, essay: false });
     setQCounts({ mc: 12, tf: 4, sa: 6, essay: 0 });
-    setQPoints({ mc: 0.25, tf: 1, sa: 0.5, essay: 2 });
+    setQPoints({ mc: "0.25", tf: "1", sa: "0.5", essay: "2" });
+  };
+
+  
+  const applyPresetNguVan = () => {
+    setQEnabled({ mc: false, tf: false, sa: true, essay: true });
+    setQCounts({ mc: 0, tf: 0, sa: 4, essay: 2 });
+    setQPoints({ mc: "0.25", tf: "0.5", sa: "0.75", essay: "2, 5" });
+    setSubject("Ngữ Văn");
   };
 
   const applyPreset4Phan = () => {
     setQEnabled({ mc: true, tf: true, sa: true, essay: true });
     setQCounts({ mc: 12, tf: 2, sa: 4, essay: 3 });
-    setQPoints({ mc: 0.25, tf: 1, sa: 0.5, essay: 1 });
+    setQPoints({ mc: "0.25", tf: "1", sa: "0.5", essay: "1" });
   };
 
   const handleGenerate = async () => {
@@ -199,7 +264,7 @@ const [examName, setExamName] = useState("");
     setError(null);
     try {
       const apiKey = localStorage.getItem("eduplan_gemini_api_key_v2");
-      if (!apiKey) throw new Error("Vui lòng cài đặt API Key trong phần Cài đặt.");
+      if (!apiKey) throw new Error("Vui lòng nhập API Key trong phần Nhập mã API key.");
 
       
       const activeQCounts = {
@@ -210,6 +275,12 @@ const [examName, setExamName] = useState("");
       };
 
       const advancedPrompt = `
+Thang điểm yêu cầu:
+${qEnabled.mc ? `- Trắc nghiệm lựa chọn: ${qPoints.mc} điểm/câu` : ""}
+${qEnabled.tf ? `- Đúng/Sai: ${qPoints.tf} điểm/câu` : ""}
+${qEnabled.sa ? `- Trả lời ngắn: ${qPoints.sa} điểm/câu (nếu nhiều mức điểm thì lấy tuần tự)` : ""}
+${qEnabled.essay ? `- Tự luận: ${qPoints.essay} điểm/câu (nếu nhiều mức điểm thì lấy tuần tự)` : ""}
+
 Mức độ nhận thức yêu cầu:
 - Nhận biết: ${levels.nb}%
 - Thông hiểu: ${levels.th}%
@@ -485,13 +556,21 @@ ${customPrompt}
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">File đính kèm (SGK / Ma trận / Học liệu):</label>
+                    
                     <div className={`w-full px-4 py-3 border rounded-lg h-24 flex items-center justify-center bg-slate-50 border-dashed relative hover:bg-slate-100 transition-colors cursor-pointer mb-2 ${generateMode === 'from_matrix_file' && !matrixFile ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}>
-                      <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,.pdf,.docx,.doc,.xlsx,.xls" />
-                      <div className="text-center">
-                        <span className="text-sm font-medium text-slate-600">{matrixFile ? matrixFile.name : "+ Chọn File đính kèm"}</span>
+                      <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                      <div className="flex flex-col items-center gap-1 text-slate-500">
+                        <UploadCloud className="w-6 h-6 text-slate-400" />
+                        <span className="text-sm font-medium">{matrixFile ? matrixFile.name : "Tải lên tệp ảnh/PDF ma trận"}</span>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-400">Hỗ trợ PDF, Word, Excel, Ảnh (JPG, PNG). Tối đa 50MB.</p>
+                    {generateMode === 'from_matrix_file' && (
+                       <label className="flex items-center gap-2 mt-2 cursor-pointer text-sm text-blue-700 bg-blue-50 p-2 rounded border border-blue-200">
+                          <input type="checkbox" checked={autoDetectStructure} onChange={e => setAutoDetectStructure(e.target.checked)} className="w-4 h-4 text-blue-600 rounded" />
+                          Tự động làm đúng số câu theo ma trận tải lên (Bỏ qua cấu trúc bên dưới)
+                       </label>
+                    )}
+                    <p className="text-xs text-slate-400 mt-2">Hỗ trợ PDF, Word, Excel, Ảnh (JPG, PNG). Tối đa 50MB.</p>
                   </div>
                 </div>
 
@@ -506,6 +585,7 @@ ${customPrompt}
                      <span className="text-xs font-medium text-slate-500 flex items-center mr-1">Gợi ý nhanh:</span>
                      <button onClick={applyPresetBGD3Phan} className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-md text-sm hover:bg-blue-100 transition-colors">Chuẩn BGD 3 phần (12 TN, 4 ĐS, 6 TLN)</button>
                      <button onClick={applyPreset4Phan} className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-md text-sm hover:bg-emerald-100 transition-colors">Đề 4 phần (có Tự luận)</button>
+                     <button onClick={applyPresetNguVan} className="px-3 py-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-md text-sm hover:bg-amber-100 transition-colors">Đề Ngữ Văn (Đọc hiểu & Làm văn)</button>
                   </div>
                   <div className="space-y-3">
                     <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 items-center">
@@ -525,10 +605,10 @@ ${customPrompt}
                          <input type="number" value={qCounts.mc} onChange={e=>setQCounts({...qCounts, mc: Number(e.target.value)})} disabled={!qEnabled.mc} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
                       </div>
                       <div className="col-span-2">
-                         <input type="number" step="0.25" value={qPoints.mc} onChange={e=>setQPoints({...qPoints, mc: Number(e.target.value)})} disabled={!qEnabled.mc} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                         <input type="text" value={qPoints.mc} onChange={e=>setQPoints({...qPoints, mc: e.target.value})} disabled={!qEnabled.mc} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" placeholder="VD: 0.25" title="Nhập điểm số (vd: 0.25) hoặc chuỗi (vd: 0.75, 1.0) cho các câu hỏi" />
                       </div>
                       <div className="col-span-2 text-center text-sm font-medium text-slate-700">
-                         {qEnabled.mc ? qCounts.mc * qPoints.mc : 0}
+                         {qEnabled.mc ? ptMC.total : 0}
                       </div>
                       <div className="col-span-1 flex justify-center">
                          <input type="checkbox" checked={qEnabled.mc} onChange={e=>setQEnabled({...qEnabled, mc: e.target.checked})} className="w-4 h-4 text-blue-600 rounded" />
@@ -543,10 +623,10 @@ ${customPrompt}
                          <input type="number" value={qCounts.tf} onChange={e=>setQCounts({...qCounts, tf: Number(e.target.value)})} disabled={!qEnabled.tf} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
                       </div>
                       <div className="col-span-2">
-                         <input type="number" step="0.25" value={qPoints.tf} onChange={e=>setQPoints({...qPoints, tf: Number(e.target.value)})} disabled={!qEnabled.tf} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                         <input type="text" value={qPoints.tf} onChange={e=>setQPoints({...qPoints, tf: e.target.value})} disabled={!qEnabled.tf} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" placeholder="VD: 0.5" title="Nhập điểm số (vd: 0.5) hoặc chuỗi (vd: 0.75, 1.0) cho các câu hỏi" />
                       </div>
                       <div className="col-span-2 text-center text-sm font-medium text-slate-700">
-                         {qEnabled.tf ? qCounts.tf * qPoints.tf : 0}
+                         {qEnabled.tf ? ptTF.total : 0}
                       </div>
                       <div className="col-span-1 flex justify-center">
                          <input type="checkbox" checked={qEnabled.tf} onChange={e=>setQEnabled({...qEnabled, tf: e.target.checked})} className="w-4 h-4 text-blue-600 rounded" />
@@ -555,16 +635,16 @@ ${customPrompt}
 
                     <div className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg ${qEnabled.sa ? 'bg-slate-50 border border-slate-200' : 'opacity-50'}`}>
                       <div className="col-span-5 flex flex-col">
-                         <span className="font-medium text-sm text-slate-700">Trả lời ngắn</span>
+                         <span className="font-medium text-sm text-slate-700">{subject.toLowerCase().includes("văn") ? "Đọc hiểu (Trả lời ngắn)" : "Trả lời ngắn"}</span>
                       </div>
                       <div className="col-span-2">
                          <input type="number" value={qCounts.sa} onChange={e=>setQCounts({...qCounts, sa: Number(e.target.value)})} disabled={!qEnabled.sa} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
                       </div>
                       <div className="col-span-2">
-                         <input type="number" step="0.25" value={qPoints.sa} onChange={e=>setQPoints({...qPoints, sa: Number(e.target.value)})} disabled={!qEnabled.sa} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                         <MultiPointInput count={qCounts.sa} value={qPoints.sa} onChange={(val) => setQPoints({...qPoints, sa: val})} disabled={!qEnabled.sa} />
                       </div>
                       <div className="col-span-2 text-center text-sm font-medium text-slate-700">
-                         {qEnabled.sa ? qCounts.sa * qPoints.sa : 0}
+                         {qEnabled.sa ? ptSA.total : 0}
                       </div>
                       <div className="col-span-1 flex justify-center">
                          <input type="checkbox" checked={qEnabled.sa} onChange={e=>setQEnabled({...qEnabled, sa: e.target.checked})} className="w-4 h-4 text-blue-600 rounded" />
@@ -573,16 +653,16 @@ ${customPrompt}
 
                     <div className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg ${qEnabled.essay ? 'bg-slate-50 border border-slate-200' : 'opacity-50'}`}>
                       <div className="col-span-5 flex flex-col">
-                         <span className="font-medium text-sm text-slate-700">Tự luận</span>
+                         <span className="font-medium text-sm text-slate-700">{subject.toLowerCase().includes("văn") ? "Làm văn (Tự luận)" : "Tự luận"}</span>
                       </div>
                       <div className="col-span-2">
                          <input type="number" value={qCounts.essay} onChange={e=>setQCounts({...qCounts, essay: Number(e.target.value)})} disabled={!qEnabled.essay} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
                       </div>
                       <div className="col-span-2">
-                         <input type="number" step="0.25" value={qPoints.essay} onChange={e=>setQPoints({...qPoints, essay: Number(e.target.value)})} disabled={!qEnabled.essay} className="w-full text-center border border-slate-300 rounded py-1.5 text-sm" />
+                         <MultiPointInput count={qCounts.essay} value={qPoints.essay} onChange={(val) => setQPoints({...qPoints, essay: val})} disabled={!qEnabled.essay} />
                       </div>
                       <div className="col-span-2 text-center text-sm font-medium text-slate-700">
-                         {qEnabled.essay ? qCounts.essay * qPoints.essay : 0}
+                         {qEnabled.essay ? ptES.total : 0}
                       </div>
                       <div className="col-span-1 flex justify-center">
                          <input type="checkbox" checked={qEnabled.essay} onChange={e=>setQEnabled({...qEnabled, essay: e.target.checked})} className="w-4 h-4 text-blue-600 rounded" />
@@ -599,34 +679,31 @@ ${customPrompt}
                 {/* 4. MỨC ĐỘ NHẬN THỨC */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                   <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
-                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">4</span> MỨC ĐỘ NHẬN THỨC <span className="font-normal text-xs text-slate-400">(CHỈ THAM KHẢO ĐANG KÉO THAY ĐỔI TỔNG TỐI ĐA 100%)</span>
+                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">4</span> MỨC ĐỘ NHẬN THỨC <span className="font-normal text-xs text-slate-400">(TỔNG: {levels.nb + levels.th + levels.vd + levels.vdc}%)</span>
                   </h3>
-                  <div className="space-y-4 text-sm">
-                     <div className="flex items-center gap-4">
-                        <div className="w-24 font-medium text-slate-700">Nhận biết</div>
-                        <input type="range" min="0" max="100" className="flex-1 accent-blue-600" value={levels.nb} onChange={e=>setLevels({...levels, nb: Number(e.target.value)})} />
-                        <div className="w-12 text-right font-medium">{levels.nb}%</div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                     <div className="flex flex-col gap-2">
+                        <div className="font-medium text-slate-700">Nhận biết (%)</div>
+                        <input type="number" min="0" max="100" className="border border-slate-300 rounded p-2 text-center" value={levels.nb} onChange={e=>setLevels({...levels, nb: Number(e.target.value)})} />
                      </div>
-                     <div className="flex items-center gap-4">
-                        <div className="w-24 font-medium text-slate-700">Thông hiểu</div>
-                        <input type="range" min="0" max="100" className="flex-1 accent-blue-600" value={levels.th} onChange={e=>setLevels({...levels, th: Number(e.target.value)})} />
-                        <div className="w-12 text-right font-medium">{levels.th}%</div>
+                     <div className="flex flex-col gap-2">
+                        <div className="font-medium text-slate-700">Thông hiểu (%)</div>
+                        <input type="number" min="0" max="100" className="border border-slate-300 rounded p-2 text-center" value={levels.th} onChange={e=>setLevels({...levels, th: Number(e.target.value)})} />
                      </div>
-                     <div className="flex items-center gap-4">
-                        <div className="w-24 font-medium text-slate-700">Vận dụng</div>
-                        <input type="range" min="0" max="100" className="flex-1 accent-blue-600" value={levels.vd} onChange={e=>setLevels({...levels, vd: Number(e.target.value)})} />
-                        <div className="w-12 text-right font-medium">{levels.vd}%</div>
+                     <div className="flex flex-col gap-2">
+                        <div className="font-medium text-slate-700">Vận dụng (%)</div>
+                        <input type="number" min="0" max="100" className="border border-slate-300 rounded p-2 text-center" value={levels.vd} onChange={e=>setLevels({...levels, vd: Number(e.target.value)})} />
                      </div>
-                     <div className="flex items-center gap-4">
-                        <div className="w-24 font-medium text-slate-700">Vận dụng cao</div>
-                        <input type="range" min="0" max="100" className="flex-1 accent-blue-600" value={levels.vdc} onChange={e=>setLevels({...levels, vdc: Number(e.target.value)})} />
-                        <div className="w-12 text-right font-medium">{levels.vdc}%</div>
-                     </div>
-                     
-                     <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded flex items-start gap-1">
-                        <Sparkles className="w-4 h-4 shrink-0" /> Để phân bổ đúng 100%, muốn tăng một mức, cần giảm một mức khác trước.
+                     <div className="flex flex-col gap-2">
+                        <div className="font-medium text-slate-700">Vận dụng cao (%)</div>
+                        <input type="number" min="0" max="100" className="border border-slate-300 rounded p-2 text-center" value={levels.vdc} onChange={e=>setLevels({...levels, vdc: Number(e.target.value)})} />
                      </div>
                   </div>
+                  {(levels.nb + levels.th + levels.vd + levels.vdc) !== 100 && (
+                     <div className="mt-4 text-xs text-amber-600 bg-amber-50 p-2 rounded flex items-start gap-1">
+                        <Sparkles className="w-4 h-4 shrink-0" /> Lưu ý: Tổng tỉ lệ hiện tại là {levels.nb + levels.th + levels.vd + levels.vdc}%. Vui lòng điều chỉnh để tổng bằng đúng 100%.
+                     </div>
+                  )}
                 </div>
 
                 {/* 5. THÀNH PHẦN ĐẦU RA */}
@@ -833,10 +910,10 @@ ${customPrompt}
                                         const totalVDC = rowData.mc.vdc + rowData.tf.vdc + rowData.sa.vdc + rowData.es.vdc;
                                         
                                         const rowPoints = 
-                                            (rowData.mc.nb + rowData.mc.th + rowData.mc.vd + rowData.mc.vdc) * qPoints.mc +
-                                            (rowData.tf.nb + rowData.tf.th + rowData.tf.vd + rowData.tf.vdc) * qPoints.tf +
-                                            (rowData.sa.nb + rowData.sa.th + rowData.sa.vd + rowData.sa.vdc) * qPoints.sa +
-                                            (rowData.es.nb + rowData.es.th + rowData.es.vd + rowData.es.vdc) * qPoints.essay;
+                                            (rowData.mc.nb + rowData.mc.th + rowData.mc.vd + rowData.mc.vdc) * ptMC.average +
+                                            (rowData.tf.nb + rowData.tf.th + rowData.tf.vd + rowData.tf.vdc) * ptTF.average +
+                                            (rowData.sa.nb + rowData.sa.th + rowData.sa.vd + rowData.sa.vdc) * ptSA.average +
+                                            (rowData.es.nb + rowData.es.th + rowData.es.vd + rowData.es.vdc) * ptES.average;
                                         const rowPercent = totalPointsCalc > 0 ? Math.round((rowPoints / totalPointsCalc) * 100) : 0;
 
                                         return (
@@ -938,10 +1015,10 @@ ${customPrompt}
                                     const gVDC = totals.mc.vdc + totals.tf.vdc + totals.sa.vdc + totals.es.vdc;
                                     
                                     const pts = {
-                                        mc: totals.mc.nb*qPoints.mc + totals.mc.th*qPoints.mc + totals.mc.vd*qPoints.mc + totals.mc.vdc*qPoints.mc,
-                                        tf: totals.tf.nb*qPoints.tf + totals.tf.th*qPoints.tf + totals.tf.vd*qPoints.tf + totals.tf.vdc*qPoints.tf,
-                                        sa: totals.sa.nb*qPoints.sa + totals.sa.th*qPoints.sa + totals.sa.vd*qPoints.sa + totals.sa.vdc*qPoints.sa,
-                                        es: totals.es.nb*qPoints.essay + totals.es.th*qPoints.essay + totals.es.vd*qPoints.essay + totals.es.vdc*qPoints.essay
+                                        mc: totals.mc.nb*ptMC.average + totals.mc.th*ptMC.average + totals.mc.vd*ptMC.average + totals.mc.vdc*ptMC.average,
+                                        tf: totals.tf.nb*ptTF.average + totals.tf.th*ptTF.average + totals.tf.vd*ptTF.average + totals.tf.vdc*ptTF.average,
+                                        sa: totals.sa.nb*ptSA.average + totals.sa.th*ptSA.average + totals.sa.vd*ptSA.average + totals.sa.vdc*ptSA.average,
+                                        es: totals.es.nb*ptES.average + totals.es.th*ptES.average + totals.es.vd*ptES.average + totals.es.vdc*ptES.average
                                     };
                                     const globalTotalPts = pts.mc + pts.tf + pts.sa + pts.es;
                                     

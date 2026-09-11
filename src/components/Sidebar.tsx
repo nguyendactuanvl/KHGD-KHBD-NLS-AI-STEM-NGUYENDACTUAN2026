@@ -1,4 +1,4 @@
-import { Trophy, BookOpen, Calendar, FileText, Settings, Sparkles, Clock, ClipboardList, FileEdit, FileCheck, Users, ShieldCheck, CalendarDays } from "lucide-react";
+import { Trophy, BookOpen, Calendar, FileText, Settings, Sparkles, Clock, ClipboardList, FileEdit, FileCheck, Users, ShieldCheck, CalendarDays, Key } from "lucide-react";
 import { cn } from "../lib/utils";
 
 interface SidebarProps {
@@ -39,7 +39,7 @@ export function Sidebar({ activeTab, setActiveTab, onOpenSettings }: SidebarProp
   ];
 
   return (
-    <div className="w-64 bg-slate-900 text-white min-h-screen flex flex-col">
+    <div className="w-64 bg-slate-900 text-white h-full flex flex-col">
       <div className="p-6 border-b border-slate-800">
         <div className="flex items-center gap-3 text-emerald-400">
           <Sparkles className="h-8 w-8" />
@@ -86,10 +86,10 @@ export function Sidebar({ activeTab, setActiveTab, onOpenSettings }: SidebarProp
       <div className="p-6 border-t border-slate-800">
         <button 
           onClick={onOpenSettings}
-          className="flex items-center gap-3 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors w-full text-left"
+          className="flex items-center gap-3 text-sm font-medium text-emerald-400 hover:text-emerald-300 transition-colors w-full text-left"
         >
-          <Settings className="h-5 w-5" />
-          Cài đặt hệ thống
+          <Key className="h-5 w-5" />
+          Nhập mã API key
         </button>
       </div>
     </div>

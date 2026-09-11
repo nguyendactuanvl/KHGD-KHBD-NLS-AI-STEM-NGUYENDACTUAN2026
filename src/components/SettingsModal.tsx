@@ -34,7 +34,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="flex items-center justify-between p-4 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
             <Key className="w-5 h-5 text-emerald-600" />
-            Cài đặt hệ thống
+            Nhập mã API key
           </h2>
           <button
             onClick={onClose}
