@@ -23,6 +23,9 @@ function handleAiError(error: any, req: any, res: any) {
   const errorMsg = error?.message || "";
   const isCustomKey = !!req.headers['x-gemini-api-key'];
 
+  if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
+    return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
+  }
   if (errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("service account is deleted") || error?.status === 401 || errorMsg.includes("ACCOUNT_STATE_INVALID")) {
     if (!isCustomKey) {
         return res.status(401).json({ error: "UNAUTHENTICATED: Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch." });
@@ -37,25 +40,60 @@ function handleAiError(error: any, req: any, res: any) {
     return res.status(401).json({ error: "UNAUTHENTICATED: Tài khoản API Key cá nhân của bạn đã bị từ chối quyền truy cập." });
   }
 
-  if (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") || errorMsg.includes("429") || error?.status === 429 || errorMsg.includes("503") || error?.status === 503 || errorMsg.includes("UNAVAILABLE")) {
-    return res.status(429).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (503). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
+  if (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") || errorMsg.includes("429") || error?.status === 429) {
+    if (!isCustomKey) {
+        return res.status(429).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (429). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
+    }
+    return res.status(429).json({ error: "API Key cá nhân của bạn đã vượt quá giới hạn lượt dùng hoặc bị giới hạn tốc độ (429). Vui lòng đợi một lát rồi thử lại hoặc kiểm tra quota." });
+  }
+  if (errorMsg.includes("503") || error?.status === 503 || errorMsg.includes("UNAVAILABLE")) {
+    if (!isCustomKey) {
+        return res.status(503).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (503). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
+    }
+    return res.status(503).json({ error: "Hệ thống AI của Google đang quá tải (503). Vui lòng đợi vài giây và thử lại." });
   }
 
   console.error("Unhandled AI Error:", error);
   res.status(500).json({ error: errorMsg || "Đã xảy ra lỗi không xác định từ máy chủ AI. Vui lòng thử lại sau." });
 }
 
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 async function generateWithFallback(req: any, payloadOptions: any) {
   const client = getAiClient(req);
-  for (const model of ["gemini-3.6-flash", "gemini-3.1-pro-preview"]) {
-    try {
-      return await client.models.generateContent({ ...payloadOptions, model });
-    } catch (e: any) {
-      if (e?.message?.includes("429") || e?.message?.includes("quota") || e?.status === 429 || e?.message?.includes("503") || e?.status === 503 || e?.message?.includes("UNAVAILABLE")) continue;
-      throw e;
+  const models = ["gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-1.5-flash"];
+  const maxRetries = 3;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    for (const model of models) {
+      try {
+        return await client.models.generateContent({ ...payloadOptions, model });
+      } catch (e: any) {
+        const errorMsg = e?.message || "";
+        const status = e?.status;
+        // Do not retry if quota is exhausted
+        if (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") || (status === 429 && !errorMsg.includes("rate limit"))) {
+             throw e; // Quota exhausted, throw immediately
+        }
+        if (
+          errorMsg.includes("429") || 
+          errorMsg.includes("503") || status === 503 || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded")
+        ) {
+          console.log(`Model ${model} failed on attempt ${attempt + 1}. Retrying...`);
+          continue; // Try next model or next attempt
+        }
+        if (errorMsg.includes("not found") || status === 404) {
+             continue; // Model might not exist, try next one
+        }
+        throw e; // Other errors (like 401, 400) throw immediately
+      }
+    }
+    // If we exhausted all models in this attempt, wait before next attempt
+    if (attempt < maxRetries - 1) {
+      await delay(2000 * (attempt + 1));
     }
   }
-  throw new Error("429 RESOURCE_EXHAUSTED All models failed");
+  throw new Error("503 UNAVAILABLE: Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (503). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân.");
 }
 
 app.all("/api/circulars", async (req, res) => {
@@ -419,8 +457,9 @@ app.all("/api/generate-lesson-plan", async (req, res) => {
     const body = req.body || {};
     
     // Thu thập đầy đủ dữ liệu từ form giao diện gửi lên
+    
     const topic = body.lesson || body.topic || body.lessonName || 'Mệnh đề';
-    const grade = body.grade || 'Lớp 10';
+    const grade = body.grade ? (typeof body.grade === 'number' ? `Lớp ${body.grade}` : body.grade) : 'Lớp 10';
     const periods = body.periods || body.numPeriods || 4;
     const requirements = body.requirement || body.requirements || body.objectives || body.details || '';
     const digitalCompetence = body.digitalComp || body.digitalCompetence || 'Không yêu cầu';
