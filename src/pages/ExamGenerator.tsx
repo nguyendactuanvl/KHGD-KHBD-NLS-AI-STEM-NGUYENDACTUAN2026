@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 
 import { fullPlan } from "../data/mockData";
 import Markdown from 'react-markdown';
@@ -197,7 +198,7 @@ const [examName, setExamName] = useState("");
     setIsGenerating(true);
     setError(null);
     try {
-      const apiKey = localStorage.getItem("user_gemini_api_key");
+      const apiKey = localStorage.getItem("eduplan_gemini_api_key_v2");
       if (!apiKey) throw new Error("Vui lòng cài đặt API Key trong phần Cài đặt.");
 
       
@@ -228,11 +229,11 @@ ${customPrompt}
         finalPrompt += "\n\nYÊU CẦU QUAN TRỌNG: Hãy sử dụng file đính kèm làm ma trận đề. Soạn các câu hỏi bám sát theo cấu trúc, số lượng câu, mức độ và nội dung được quy định trong file ma trận tải lên này.";
       }
 
-      const response = await fetch("/api/generate-exam", {
+      const response = await apiFetch("/api/generate-exam", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
+          "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "")
         },
         body: JSON.stringify({ 
           subject, grade, duration, examType, matrix, customPrompt: finalPrompt,
@@ -327,7 +328,7 @@ ${customPrompt}
 
   const handleShare = async () => {
     try {
-      const response = await fetch("/api/exams/share", {
+      const response = await apiFetch("/api/exams/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

@@ -30,10 +30,9 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
-    const storedKey = localStorage.getItem("user_gemini_api_key");
-    if (!storedKey) {
-      setIsSettingsOpen(true);
-    }
+    const handleShowModal = () => setIsSettingsOpen(true);
+    window.addEventListener('show-api-key-modal', handleShowModal);
+    return () => window.removeEventListener('show-api-key-modal', handleShowModal);
   }, []);
 
   

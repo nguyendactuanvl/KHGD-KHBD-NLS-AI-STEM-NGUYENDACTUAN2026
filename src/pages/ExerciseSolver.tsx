@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import { exportHtmlToWord } from '../lib/exportUtils';
 import React, { useState, useRef, useMemo } from 'react';
 import { Copy, Save, Upload, X, Sparkles, Loader2, Download, Presentation, ChevronLeft, ChevronRight, Maximize2, FileText, BookmarkPlus, Camera, Image as ImageIcon, Send, ArrowLeft } from 'lucide-react';
@@ -96,9 +97,9 @@ export function ExerciseSolver() {
         fileData = await fileToBase64(selectedFile);
       }
 
-      const response = await fetch('/api/generate-similar', {
+      const response = await apiFetch('/api/generate-similar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': encodeURIComponent(localStorage.getItem('user_gemini_api_key') || '') },
+        headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': encodeURIComponent(localStorage.getItem('eduplan_gemini_api_key_v2') || '') },
         body: JSON.stringify({
           files: [{ data: fileData, type: mimeType }]
         })
@@ -138,9 +139,9 @@ const handleSolve = async () => {
         fileData = await fileToBase64(selectedFile);
       }
 
-      const response = await fetch('/api/solve-exercise', {
+      const response = await apiFetch('/api/solve-exercise', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': encodeURIComponent(localStorage.getItem('user_gemini_api_key') || '') },
+        headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': encodeURIComponent(localStorage.getItem('eduplan_gemini_api_key_v2') || '') },
         body: JSON.stringify({
           files: [{ data: fileData, type: mimeType }]
         })

@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import { exportHtmlToWord } from '../lib/exportUtils';
 import React, { useState, useRef } from "react";
 import { KHGDRow } from "../types";
@@ -88,11 +89,11 @@ export function EducationalPlan() {
   const generateAIPlan = async () => {
     setIsGenerating(true);
     try {
-      const response = await fetch("/api/generate-plan", {
+      const response = await apiFetch("/api/generate-plan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || ""),
+          "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || ""),
         },
         body: JSON.stringify({
           subject,

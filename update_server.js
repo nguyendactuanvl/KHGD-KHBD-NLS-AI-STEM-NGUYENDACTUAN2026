@@ -1,20 +1,10 @@
 const fs = require('fs');
-let code = fs.readFileSync('server.ts', 'utf-8');
 
-const schemaProperties = `properties: {
-                    id: { type: Type.NUMBER },
-                    type: { type: Type.STRING },
-                    content: { type: Type.STRING },
-                    options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    correctOptionIndex: { type: Type.NUMBER },
-                    correctAnswer: { type: Type.STRING },
-                    level: { type: Type.STRING },
-                    topic: { type: Type.STRING, description: "Chủ đề hoặc Chương. Bắt buộc." },
-                    subtopic: { type: Type.STRING, description: "Nội dung hoặc Đơn vị kiến thức. Bắt buộc." }
-                  },
-                  required: ["id", "type", "content", "level", "topic", "subtopic"]`;
+let content = fs.readFileSync('server.ts', 'utf8');
+content = content.replace(/if \(!isCustomKey\) \{\s*return res\.status\(400\)\.json\(\{ error: "Hệ thống AI hiện đang bảo trì[^}]+\} /g, 
+  'if (!isCustomKey) { return res.status(401).json({ error: "UNAUTHENTICATED: Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Vui lòng nhập API Key cá nhân." }); } ');
 
-code = code.replace(/properties:\s*\{\s*id:\s*\{\s*type:\s*Type\.NUMBER\s*\},[\s\S]*?required:\s*\["id",\s*"type",\s*"content",\s*"level"\]/, schemaProperties);
+content = content.replace(/return res\.status\(400\)\.json\(\{ error: "Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa[^}]+\} /g,
+  'return res.status(401).json({ error: "UNAUTHENTICATED: Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa. Vui lòng tạo API Key mới." }); ');
 
-fs.writeFileSync('server.ts', code);
-console.log('patched');
+fs.writeFileSync('server.ts', content);

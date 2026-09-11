@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import { useState, useEffect } from "react";
 import { Calendar, Plus, Upload, CheckSquare, Trash2, Loader2, FileImage, Moon } from "lucide-react";
 
@@ -86,12 +87,12 @@ export function WeeklyTimetable() {
       const base64 = event.target?.result as string;
       setIsExtracting(true);
       try {
-        const key = localStorage.getItem("user_gemini_api_key") || "";
-        const res = await fetch("/api/extract-data", {
+        const key = localStorage.getItem("eduplan_gemini_api_key_v2") || "";
+        const res = await apiFetch("/api/extract-data", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
+            "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "")
           },
           body: JSON.stringify({ file: base64, type: "timetable" })
         });

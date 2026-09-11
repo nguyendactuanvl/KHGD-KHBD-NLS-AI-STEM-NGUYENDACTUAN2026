@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -18,7 +19,7 @@ export function StudentExamView({ examId }: { examId: string }) {
   const [score, setScore] = useState(0);
 
   useEffect(() => {
-    fetch(`/api/exams/${examId}`)
+    apiFetch(`/api/exams/${examId}`)
       .then(res => {
         if (!res.ok) throw new Error("Không tìm thấy đề thi. Có thể link đã hết hạn.");
         return res.json();

@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import { exportHtmlToWord } from '../lib/exportUtils';
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Save, BookOpen, Download, AlertCircle, Upload, Edit3, Eye, Presentation } from "lucide-react";
@@ -120,11 +121,11 @@ export function LessonPlan() {
         };
       }
       
-      const response = await fetch(endpoint, {
+      const response = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-gemini-api-key': encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
+          'x-gemini-api-key': encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "")
         },
         body: JSON.stringify(payload)
       });

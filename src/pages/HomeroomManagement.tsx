@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import { exportHtmlToWord } from '../lib/exportUtils';
 import { useState, useEffect } from "react";
 import { Upload, Plus, Save, Trash2, Award, FileText, Loader2, FileImage, Search, Edit3, Download, Printer, Trophy } from "lucide-react";
@@ -175,12 +176,12 @@ export function HomeroomManagement() {
          const base64 = event.target?.result as string;
          setIsExtracting(true);
          try {
-           const key = localStorage.getItem("user_gemini_api_key") || "";
-           const res = await fetch("/api/extract-data", {
+           const key = localStorage.getItem("eduplan_gemini_api_key_v2") || "";
+           const res = await apiFetch("/api/extract-data", {
              method: "POST",
              headers: {
                "Content-Type": "application/json",
-               "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
+               "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "")
              },
              body: JSON.stringify({ file: base64, type: "student_profiles" })
            });

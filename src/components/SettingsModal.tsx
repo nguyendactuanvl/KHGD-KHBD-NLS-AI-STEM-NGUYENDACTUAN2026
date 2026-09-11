@@ -12,14 +12,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   useEffect(() => {
     if (isOpen) {
-      const storedKey = localStorage.getItem("user_gemini_api_key") || "";
+      const storedKey = localStorage.getItem("eduplan_gemini_api_key_v2") || "";
       setApiKey(storedKey);
       setIsSaved(false);
     }
   }, [isOpen]);
 
   const handleSave = () => {
-    localStorage.setItem("user_gemini_api_key", apiKey.trim());
+    localStorage.setItem("eduplan_gemini_api_key_v2", apiKey.trim());
     setIsSaved(true);
     setTimeout(() => {
       onClose();

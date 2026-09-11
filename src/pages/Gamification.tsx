@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import { useState, useEffect, useRef } from "react";
 import { Trophy, Star, MinusCircle, Play, Users, Medal, Crown, Filter, History, Loader2, Upload, Plus, Trash2, Edit2, FolderOpen, MessageSquare, X, Send } from "lucide-react";
 import { Student } from "../types";
@@ -157,12 +158,12 @@ export function Gamification() {
       const base64 = event.target?.result as string;
       setIsExtractingSt(true);
       try {
-        const key = localStorage.getItem("user_gemini_api_key") || "";
-        const res = await fetch("/api/extract-data", {
+        const key = localStorage.getItem("eduplan_gemini_api_key_v2") || "";
+        const res = await apiFetch("/api/extract-data", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
+            "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "")
           },
           body: JSON.stringify({ file: base64, type: "students" })
         });
@@ -293,9 +294,9 @@ export function Gamification() {
         score: rs.total
       })).slice(0, 15);
 
-      const res = await fetch("/api/chat", {
+      const res = await apiFetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-gemini-api-key": encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "") },
+        headers: { "Content-Type": "application/json", "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "") },
         body: JSON.stringify({ prompt: aiQuery, context: rankedData })
       });
       const data = await res.json();

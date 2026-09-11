@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import { exportHtmlToWord } from '../lib/exportUtils';
 import React, { useState, useRef } from 'react';
 import { Upload, X, FileText, Loader2, Download, AlertCircle } from 'lucide-react';
@@ -81,9 +82,9 @@ export function PdfToWord() {
         fileData = await fileToBase64(selectedFile);
       }
 
-      const response = await fetch('/api/pdf-to-word', {
+      const response = await apiFetch('/api/pdf-to-word', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': encodeURIComponent(localStorage.getItem('user_gemini_api_key') || '') },
+        headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': encodeURIComponent(localStorage.getItem('eduplan_gemini_api_key_v2') || '') },
         body: JSON.stringify({
           files: [{ data: fileData, type: mimeType }]
         })

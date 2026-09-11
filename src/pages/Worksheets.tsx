@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import { exportHtmlToWord } from "../lib/exportUtils";
 import { useState, useRef } from "react";
 import { Sparkles, Save, BookOpen, Download, AlertCircle, Edit3, Eye } from "lucide-react";
@@ -47,11 +48,11 @@ export function Worksheets() {
     setSuggestion("");
     
     try {
-      const response = await fetch('/api/generate-worksheet', {
+      const response = await apiFetch('/api/generate-worksheet', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-gemini-api-key': encodeURIComponent(localStorage.getItem("user_gemini_api_key") || "")
+          'x-gemini-api-key': encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "")
         },
         body: JSON.stringify({
           lesson: customLessonName,
