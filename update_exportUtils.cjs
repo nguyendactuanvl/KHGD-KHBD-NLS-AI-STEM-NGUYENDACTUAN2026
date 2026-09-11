@@ -1,8 +1,10 @@
-export function exportHtmlToWord(element: HTMLElement, filename: string) {
+const fs = require('fs');
+
+const newContent = `export function exportHtmlToWord(element: HTMLElement, filename: string) {
     const clone = element.cloneNode(true) as HTMLElement;
     
     // Transform grid into tables for MS Word
-    const grids = clone.querySelectorAll('.grid-cols-1.sm\\:grid-cols-2, .grid');
+    const grids = clone.querySelectorAll('.grid-cols-1.sm\\\\:grid-cols-2, .grid');
     grids.forEach(grid => {
         if (grid.children.length === 0) return;
         const children = Array.from(grid.children);
@@ -27,36 +29,7 @@ export function exportHtmlToWord(element: HTMLElement, filename: string) {
         }
     });
 
-    
-    // Transform options flex containers to tables
-    const flexOpts = clone.querySelectorAll('.flex.items-start.gap-1');
-    flexOpts.forEach(flex => {
-        if (flex.children.length >= 2 && flex.children[0].tagName === 'SPAN' && flex.children[1].classList.contains('markdown-body')) {
-            const table = document.createElement('table');
-            table.setAttribute('style', 'width: 100%; border: none; border-collapse: collapse; margin: 0; padding: 0;');
-            const tr = document.createElement('tr');
-            tr.setAttribute('style', 'border: none;');
-            
-            const td1 = document.createElement('td');
-            td1.setAttribute('style', 'width: 25px; border: none; padding: 0; vertical-align: top; font-weight: bold;');
-            td1.innerHTML = flex.children[0].innerHTML;
-            
-            const td2 = document.createElement('td');
-            td2.setAttribute('style', 'border: none; padding: 0; vertical-align: top;');
-            td2.innerHTML = flex.children[1].innerHTML;
-            
-            tr.appendChild(td1);
-            tr.appendChild(td2);
-            table.appendChild(tr);
-            
-            if (flex.parentNode) {
-                flex.parentNode.replaceChild(table, flex);
-            }
-        }
-    });
-
-    // Extract MathML
- // from KaTeX for native Word Equation support
+    // Extract MathML from KaTeX for native Word Equation support
     const katexElements = clone.querySelectorAll('.katex');
     katexElements.forEach(el => {
       const mathNode = el.querySelector('.katex-mathml math');
@@ -85,7 +58,7 @@ export function exportHtmlToWord(element: HTMLElement, filename: string) {
     });
 
     const contentHtml = clone.innerHTML;
-    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'>
+    const header = \`<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
 <meta charset='utf-8'>
 <title>Document</title>
@@ -107,11 +80,11 @@ math { font-family: "Cambria Math", serif; }
 </style>
 </head>
 <body>
-<div class="Section1">`;
+<div class="Section1">\`;
     const footer = "</div></body></html>";
     const sourceHTML = header + contentHtml + footer;
     
-    const blob = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
+    const blob = new Blob(['\\ufeff', sourceHTML], { type: 'application/msword' });
     const source = URL.createObjectURL(blob);
     const fileDownload = document.createElement("a");
     document.body.appendChild(fileDownload);
@@ -120,3 +93,6 @@ math { font-family: "Cambria Math", serif; }
     fileDownload.click();
     document.body.removeChild(fileDownload);
 }
+`;
+
+fs.writeFileSync('src/lib/exportUtils.ts', newContent);
