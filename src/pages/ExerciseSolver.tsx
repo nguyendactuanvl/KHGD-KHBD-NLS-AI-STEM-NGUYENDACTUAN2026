@@ -83,7 +83,6 @@ export function ExerciseSolver() {
 
     setIsGeneratingSimilar(true);
     setError(null);
-    setSolution('');
 
     try {
       let fileData = '';

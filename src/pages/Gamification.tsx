@@ -220,7 +220,10 @@ export function Gamification() {
 
   // --- PICKER LOGIC ---
   const startSpin = () => {
-    if (students.length === 0) return;
+    if (students.length === 0) {
+      showDialog('alert', 'Danh sách lớp hiện tại đang trống. Vui lòng chuyển sang tab "Chấm điểm nhanh" để thêm học sinh hoặc tải lên danh sách trước khi quay!');
+      return;
+    }
     setIsSpinning(true);
     setSelectedStudent(null);
     let speed = 50;
