@@ -1,4 +1,7 @@
+import { exportHtmlToWord } from '../lib/exportUtils';
+import React, { useState, useRef, useMemo } from 'react';
 import { Copy, Save, Upload, X, Sparkles, Loader2, Download, Presentation, ChevronLeft, ChevronRight, Maximize2, FileText, BookmarkPlus, Camera, Image as ImageIcon, Send, ArrowLeft } from 'lucide-react';
+
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
