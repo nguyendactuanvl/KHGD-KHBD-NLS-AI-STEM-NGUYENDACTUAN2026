@@ -1,13 +1,14 @@
 import { apiFetch } from '../lib/apiFetch';
 import { exportHtmlToWord } from "../lib/exportUtils";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Sparkles, Save, BookOpen, Download, AlertCircle, Edit3, Eye } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { saveToHistory } from '../lib/history';
+import { saveToHistory, getHistory } from '../lib/history';
+import { HistoryItem } from '../types';
 import { cn } from "../lib/utils";
 import pptxgen from "pptxgenjs";
 import { Presentation } from "lucide-react";
@@ -22,6 +23,11 @@ export function Worksheets() {
   
   const [suggestion, setSuggestion] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  
+  useEffect(() => {
+    setHistoryItems(getHistory().filter(item => item.type === 'PHT'));
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -93,6 +99,7 @@ export function Worksheets() {
         lessonName: customLessonName,
         content: data.result
       });
+      setHistoryItems(getHistory().filter(item => item.type === 'PHT'));
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Không thể tạo phiếu học tập lúc này. Vui lòng thử lại sau.");
@@ -212,6 +219,35 @@ export function Worksheets() {
             Tạo phiếu bài tập, tóm tắt kiến thức cho học sinh
           </p>
         </div>
+
+        {historyItems.length > 0 && (
+          <div className="p-4 border-b border-slate-200 bg-white">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Lịch sử đã tạo
+            </label>
+            <select
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+              onChange={(e) => {
+                if (e.target.value) {
+                  const item = historyItems.find(h => h.id === e.target.value);
+                  if (item) {
+                    setSuggestion(item.content);
+                    setCustomLessonName(item.lessonName);
+                    if (item.subject) setSubject(item.subject);
+                    if (item.grade) setSelectedGrade(item.grade);
+                  }
+                }
+              }}
+            >
+              <option value="">-- Chọn phiếu học tập đã tạo --</option>
+              {historyItems.map(item => (
+                <option key={item.id} value={item.id}>
+                  {new Date(item.createdAt).toLocaleDateString('vi-VN')} - {item.lessonName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           <div className="space-y-4">

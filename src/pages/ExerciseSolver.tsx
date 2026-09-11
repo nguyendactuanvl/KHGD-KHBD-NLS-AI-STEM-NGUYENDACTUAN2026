@@ -1,6 +1,6 @@
 import { apiFetch } from '../lib/apiFetch';
 import { exportHtmlToWord } from '../lib/exportUtils';
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Copy, Save, Upload, X, Sparkles, Loader2, Download, Presentation, ChevronLeft, ChevronRight, Maximize2, FileText, BookmarkPlus, Camera, Image as ImageIcon, Send, ArrowLeft } from 'lucide-react';
 
 import Markdown from 'react-markdown';
@@ -12,7 +12,8 @@ import rehypeRaw from 'rehype-raw';
 import mammoth from 'mammoth';
 import pptxgen from "pptxgenjs";
 import { printElement } from '../lib/print';
-import { saveToHistory } from '../lib/history';
+import { saveToHistory, getHistory } from '../lib/history';
+import { HistoryItem } from '../types';
 
 // Utility to convert file to base64
 const fileToBase64 = (file: File): Promise<string> => {
@@ -35,6 +36,11 @@ export function ExerciseSolver() {
   const [isGeneratingSimilar, setIsGeneratingSimilar] = useState(false);
   const [solution, setSolution] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  
+  useEffect(() => {
+    setHistoryItems(getHistory().filter(item => item.type === 'GBT'));
+  }, []);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   
@@ -208,7 +214,16 @@ const handleSolve = async () => {
       }
 
       const data = await response.json();
-      setSolution(typeof data.result === 'string' ? data.result : (data.result?.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data.result)));
+      const newSolution = typeof data.result === 'string' ? data.result : (data.result?.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data.result));
+      setSolution(newSolution);
+      saveToHistory({
+        type: "GBT",
+        grade: 0,
+        subject: "Chung",
+        lessonName: selectedFile ? "Giải bài tập: " + selectedFile.name : "Giải bài tập mới",
+        content: newSolution
+      });
+      setHistoryItems(getHistory().filter(item => item.type === 'GBT'));
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Lỗi kết nối. Vui lòng thử lại sau.');
@@ -306,6 +321,32 @@ const handleSolve = async () => {
     <div className="max-w-7xl mx-auto space-y-6 p-4 lg:p-8">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 lg:p-8">
         <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Trợ lý Giải Bài Tập Thông Minh</h2>
+        
+        {historyItems.length > 0 && (
+          <div className="max-w-2xl mx-auto mb-6 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100">
+            <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+              <BookmarkPlus className="w-4 h-4 text-indigo-600" /> Lịch sử đã giải
+            </label>
+            <select
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              onChange={(e) => {
+                if (e.target.value) {
+                  const item = historyItems.find(h => h.id === e.target.value);
+                  if (item) {
+                    setSolution(item.content);
+                  }
+                }
+              }}
+            >
+              <option value="">-- Chọn bài tập đã giải trong lịch sử --</option>
+              {historyItems.map(item => (
+                <option key={item.id} value={item.id}>
+                  {new Date(item.createdAt).toLocaleDateString('vi-VN')} - {item.lessonName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         
         {!solution && (
           <div className="max-w-2xl mx-auto">
