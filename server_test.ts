@@ -2,6 +2,7 @@
 import express from "express";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
+import { createServer as createViteServer } from "vite";
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -861,7 +862,7 @@ app.use((err: any, req: any, res: any, next: any) => {
 });
 
 if (!process.env.VERCEL) {
-  const PORT = 3000;
+  const PORT = 3005;
   if (process.env.NODE_ENV !== "production") {
     import("vite").then(async ({ createServer }) => {
       const vite = await createServer({ server: { middlewareMode: true }, appType: "spa" });
@@ -871,7 +872,7 @@ if (!process.env.VERCEL) {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
+    app.get("*all", (req, res) => res.sendFile(path.join(distPath, "index.html")));
     app.listen(PORT, "0.0.0.0", () => console.log("Server running on port " + PORT));
   }
 }
