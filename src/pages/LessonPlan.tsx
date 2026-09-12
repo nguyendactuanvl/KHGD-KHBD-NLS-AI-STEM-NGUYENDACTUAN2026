@@ -150,7 +150,9 @@ export function LessonPlan() {
         throw new Error(errorMsg);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
       setSuggestion(data.result);
       
       // Save to history
@@ -163,7 +165,18 @@ export function LessonPlan() {
       });
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Không thể soạn giáo án lúc này. Vui lòng thử lại sau.");
+      let errorMsg = err.message || "";
+      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+        errorMsg = "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao. Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân.";
+      } else if (errorMsg.includes('{"error":')) {
+        try {
+          const parsed = JSON.parse(errorMsg);
+          errorMsg = parsed.error?.message || "Có lỗi xảy ra khi xử lý file";
+        } catch {
+          errorMsg = "Có lỗi xảy ra trong quá trình tạo tài liệu. Vui lòng thử lại.";
+        }
+      }
+      setError(errorMsg || "Không thể soạn giáo án lúc này. Vui lòng thử lại sau.");
     } finally {
       setIsLoading(false);
     }

@@ -166,7 +166,9 @@ export function ExerciseSolver() {
         })
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
       if (!response.ok) throw new Error(data.error || 'Failed to generate similar exercise');
       
       setSolution(typeof data.result === 'string' ? data.result : (data.result?.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data.result)));
@@ -209,11 +211,15 @@ const handleSolve = async () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
         throw new Error(errorData.error || 'Có lỗi xảy ra khi xử lý file');
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
       const newSolution = typeof data.result === 'string' ? data.result : (data.result?.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data.result));
       setSolution(newSolution);
       saveToHistory({

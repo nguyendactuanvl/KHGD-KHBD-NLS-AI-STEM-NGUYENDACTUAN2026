@@ -316,11 +316,15 @@ ${customPrompt}
 
 
       if (!response.ok) {
-        const err = await response.json();
+        const text = await response.text();
+      let err;
+      try { err = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
         throw new Error(err.error || "Có lỗi xảy ra khi tạo đề.");
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
       setExamName(data.examName || "Đề kiểm tra");
       setQuestions(data.questions || []);
       setActiveTab("exam");
@@ -407,7 +411,9 @@ ${customPrompt}
           codes: shuffledExams 
         })
       });
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
       if (data.examId) {
         const url = new URL(window.location.href);
         url.search = `?examId=${data.examId}`;

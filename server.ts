@@ -44,7 +44,7 @@ function handleAiError(error: any, req: any, res: any) {
     if (!isCustomKey) {
         return res.status(429).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (429). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
     }
-    return res.status(429).json({ error: "API Key cá nhân của bạn đã bị giới hạn tốc độ (Lỗi 429). Đối với Key miễn phí của Google AI Studio, giới hạn là 15 câu lệnh/phút. Vui lòng đợi đúng 1 phút rồi thử lại." });
+    return res.status(429).json({ error: "API Key cá nhân của bạn hiện đang nhận quá nhiều yêu cầu cùng lúc (Lỗi 429). Chi tiết từ Google: " + errorMsg });
   }
   if (errorMsg.includes("503") || error?.status === 503 || errorMsg.includes("UNAVAILABLE")) {
     if (!isCustomKey) {
@@ -61,7 +61,7 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 async function generateWithFallback(req: any, payloadOptions: any) {
   const client = getAiClient(req);
-  const models = ["gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-2.0-flash"];
+  const models = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.5-flash"];
   let primaryError: any = null;
   
   const maxRetries = 3;
@@ -90,7 +90,7 @@ async function generateWithFallback(req: any, payloadOptions: any) {
     
     // If all models failed with 429/503, wait and retry
     if (primaryError && attempt < maxRetries - 1) {
-      console.warn(`Attempt ${attempt + 1} failed with Quota/Overload. Retrying in ${2000 * (attempt + 1)}ms...`);
+      
       await delay(2000 * (attempt + 1) + Math.random() * 1000);
     }
   }
@@ -256,7 +256,8 @@ app.all("/api/generate-exam", async (req, res) => {
 - Trắc nghiệm Đúng/Sai (tf): ${tf} câu.
 - Trắc nghiệm trả lời ngắn (sa): ${sa} câu.
 - Tự luận (essay): ${essay} câu.
-`;
+- BẮT BUỘC dùng chuẩn LaTeX bọc trong dấu $ cho mọi công thức. LUÔN LUÔN CÓ KHOẢNG TRẮNG trước và sau dấu $ để tránh lỗi dính chữ khi xuất file (Ví dụ đúng: "Có $x = 2$ nghiệm", sai: "Có$x=2$nghiệm").
+- BẮT BUỘC soát lỗi chính tả tiếng Việt thật cẩn thận.`;
 
     const promptText = `Bạn là chuyên gia ra đề thi môn ${subject} Lớp ${grade}.
 Thời gian làm bài: ${duration} phút.
@@ -634,7 +635,8 @@ YÊU CẦU:
 ## Lời giải chi tiết
 [Các bước giải chi tiết cho đề tương tự]
 
-LƯU Ý ĐỐI VỚI CÔNG THỨC: BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức toán học, lý, hóa. Sử dụng duy nhất dấu $ cho công thức trong dòng và $$ cho công thức riêng. KHÔNG sử dụng ký tự Unicode mô phỏng công thức.`;
+LƯU Ý ĐỐI VỚI CÔNG THỨC: BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức toán học, lý, hóa. Sử dụng duy nhất dấu $ cho công thức trong dòng. ĐẶC BIỆT QUAN TRỌNG: LUÔN LUÔN CÓ KHOẢNG TRẮNG trước và sau dấu $ để không bị dính chữ (Ví dụ đúng: "Ta có $x=2$ là", sai: "Ta có$x=2$là"). KHÔNG sử dụng ký tự Unicode mô phỏng công thức.
+BẮT BUỘC kiểm tra và SỬA LỖI CHÍNH TẢ tiếng Việt thật cẩn thận trước khi trả kết quả.`;
 
       const response = await generateWithFallback(req, {
         contents: [
@@ -682,8 +684,9 @@ app.all("/api/generate-worksheet", async (req, res) => {
          - Hình thức: ${type || "Kết hợp trắc nghiệm và tự luận"}.
          - Phân hóa từ cơ bản đến vận dụng.
       4. Trình bày rõ ràng, để lại khoảng trống hợp lý giả định học sinh sẽ làm trực tiếp vào phiếu.
-      5. ĐỐI VỚI CÁC MÔN KHOA HỌC: BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức. TẤT CẢ các biến số (như $x, V$), giá trị (như $500\text{ cm}^3$) ĐỀU PHẢI bọc trong dấu $. Sử dụng duy nhất dấu $ cho công thức trong dòng và $ cho công thức riêng.
-      6. ĐÁP ÁN: Ở cuối tài liệu, hãy cung cấp phần Hướng dẫn giải/Đáp án, phân cách bằng một tiêu đề thật rõ ràng (ví dụ: "--- HƯỚNG DẪN CHẤM / ĐÁP ÁN ---") để giáo viên có thể cắt/xóa trước khi in cho học sinh.`;
+      5. KHOA HỌC/TOÁN: BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức. TẤT CẢ các biến số (như $x, V$), giá trị (như $500\\text{ cm}^3$) ĐỀU PHẢI bọc trong dấu $. Sử dụng duy nhất dấu $ cho công thức trong dòng. ĐẶC BIỆT QUAN TRỌNG: LUÔN LUÔN CÓ KHOẢNG TRẮNG trước và sau dấu $ để không bị dính chữ khi xuất file (Ví dụ đúng: "Ta có $x=2$ là", sai: "Ta có$x=2$là").
+      6. ĐÁP ÁN: Ở cuối tài liệu, hãy cung cấp phần Hướng dẫn giải/Đáp án, phân cách bằng tiêu đề "--- HƯỚNG DẪN CHẤM / ĐÁP ÁN ---".
+      7. BẮT BUỘC kiểm tra và SỬA LỖI CHÍNH TẢ tiếng Việt thật cẩn thận trước khi trả kết quả.`;
 
       const response = await generateWithFallback(req, {
         contents: prompt,
@@ -778,7 +781,8 @@ YÊU CẦU:
 ## Lời giải chi tiết
 [Các bước giải chi tiết]
 
-5. ĐỐI VỚI CÁC MÔN KHOA HỌC: BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức. TẤT CẢ các biến số (như $x, V$), giá trị (như $500\text{ cm}^3$) ĐỀU PHẢI bọc trong dấu $. Sử dụng duy nhất dấu $ cho công thức trong dòng và $ cho công thức riêng.`;
+5. KHOA HỌC/TOÁN: BẮT BUỘC sử dụng chuẩn LaTeX cho MỌI công thức. TẤT CẢ các biến số (như $x, V$), giá trị (như $500\\text{ cm}^3$) ĐỀU PHẢI bọc trong dấu $. Sử dụng duy nhất dấu $ cho công thức trong dòng. ĐẶC BIỆT QUAN TRỌNG: LUÔN LUÔN CÓ KHOẢNG TRẮNG trước và sau dấu $ để không bị dính chữ (Ví dụ đúng: "Ta có $x=2$ là", sai: "Ta có$x=2$là").
+6. BẮT BUỘC kiểm tra và SỬA LỖI CHÍNH TẢ tiếng Việt thật cẩn thận trước khi trả kết quả.`;
 
       const response = await generateWithFallback(req, {
         contents: [
@@ -809,6 +813,16 @@ YÊU CẦU:
 
 });
 
+app.all("/api/exams/share", (req, res) => {
+  try {
+    const examId = Math.random().toString(36).substring(2, 10);
+    sharedExamsStore.set(examId, req.body);
+    res.json({ examId });
+  } catch (error) {
+    res.status(500).json({ error: "Lỗi chia sẻ đề thi" });
+  }
+});
+
 app.get("/api/exams/:id", (req, res) => {
   const data = sharedExamsStore.get(req.params.id);
   if (data) res.json(data);
@@ -830,6 +844,21 @@ app.post("/api/chat", async (req, res) => {
   } catch (error: any) {
     return handleAiError(error, req, res);
   }
+});
+
+app.use("/api", (req, res) => {
+  res.status(404).json({ error: "API endpoint không tồn tại." });
+});
+
+app.use((err: any, req: any, res: any, next: any) => {
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    return res.status(400).json({ error: "Dữ liệu JSON không hợp lệ." });
+  }
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({ error: "Dữ liệu gửi lên quá lớn. Vui lòng giảm dung lượng file (tối đa 50MB)." });
+  }
+  console.error("Express Error:", err);
+  res.status(err.status || 500).json({ error: err.message || "Đã xảy ra lỗi hệ thống." });
 });
 
 if (!process.env.VERCEL) {

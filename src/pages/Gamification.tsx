@@ -167,7 +167,9 @@ export function Gamification() {
           },
           body: JSON.stringify({ file: base64, type: "students" })
         });
-        const data = await res.json();
+        const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ: ${text.substring(0, 50)}...`); }
         
         if (data.students && Array.isArray(data.students)) {
           const newStudents = data.students.map((name: string, i: number) => ({
@@ -299,7 +301,9 @@ export function Gamification() {
         headers: { "Content-Type": "application/json", "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "") },
         body: JSON.stringify({ prompt: aiQuery, context: rankedData })
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ: ${text.substring(0, 50)}...`); }
       if (res.ok) {
         setAiResponse(data.text);
       } else {

@@ -27,11 +27,10 @@ async function generateWithFallback(req: any, payloadOptions: any) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     for (const model of models) {
       try {
-        console.log(`Trying model ${model} (attempt ${attempt + 1})...`);
+        
         return await client.models.generateContent({ ...payloadOptions, model });
       } catch (error: any) {
-        console.error(`Model ${model} failed:`, error?.message);
-        const errorMsg = error?.message || "";
+                const errorMsg = error?.message || "";
         const status = error?.status;
         
         if (
@@ -49,7 +48,7 @@ async function generateWithFallback(req: any, payloadOptions: any) {
       }
     }
     if (primaryError && attempt < maxRetries - 1) {
-      console.warn(`Attempt ${attempt + 1} failed with Quota/Overload. Retrying in ${3000 * (attempt + 1)}ms...`);
+      
       await delay(3000 * (attempt + 1) + Math.random() * 1000);
     }
   }
@@ -117,6 +116,11 @@ YÊU CẦU NGHIÊM NGẶT:
       res.json({ result: response.text });
     } catch (error: any) {
       console.error("Error converting pdf to word:", error);
-      res.status(500).json({ error: error.message || "Failed to convert document" });
+      const errorMsg = error?.message || "";
+      if (errorMsg.includes("429") || error?.status === 429 || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+        return res.status(429).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao. Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
+      }
+      return res.status(500).json({ error: "Có lỗi xảy ra trong quá trình số hóa tài liệu. Vui lòng thử lại." });
     }
+}
 }

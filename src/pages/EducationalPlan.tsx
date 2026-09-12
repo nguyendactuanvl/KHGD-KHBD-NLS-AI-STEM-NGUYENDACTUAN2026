@@ -123,7 +123,9 @@ export function EducationalPlan() {
         throw new Error(errorMsg);
       }
       
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
       if (data && Array.isArray(data) && data.length > 0) {
         const newPlans = data.map((item: any, index: number) => ({
           id: Date.now().toString() + index,

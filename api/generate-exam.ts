@@ -25,11 +25,10 @@ async function generateWithFallback(req: any, payloadOptions: any) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     for (const model of models) {
       try {
-        console.log(`Trying model ${model} (attempt ${attempt + 1})...`);
+        
         return await client.models.generateContent({ ...payloadOptions, model });
       } catch (error: any) {
-        console.error(`Model ${model} failed:`, error?.message);
-        const errorMsg = error?.message || "";
+                const errorMsg = error?.message || "";
         const status = error?.status;
         
         if (
@@ -47,7 +46,7 @@ async function generateWithFallback(req: any, payloadOptions: any) {
       }
     }
     if (primaryError && attempt < maxRetries - 1) {
-      console.warn(`Attempt ${attempt + 1} failed with Quota/Overload. Retrying in ${3000 * (attempt + 1)}ms...`);
+      
       await delay(3000 * (attempt + 1) + Math.random() * 1000);
     }
   }

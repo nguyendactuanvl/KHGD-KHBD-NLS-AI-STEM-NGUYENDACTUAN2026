@@ -88,7 +88,9 @@ export function Worksheets() {
         throw new Error(errorMsg);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
       setSuggestion(data.result);
       
       // Save to history

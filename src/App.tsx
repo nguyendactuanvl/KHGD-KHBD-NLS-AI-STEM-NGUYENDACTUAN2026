@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Menu, Sparkles, Key } from "lucide-react";
+import { Menu, Sparkles, Key, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { EducationalPlan } from "./pages/EducationalPlan";
@@ -28,11 +28,22 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("gamification");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [retryStatus, setRetryStatus] = useState<{ attempt: number, maxRetries: number } | null>(null);
 
   useEffect(() => {
     const handleShowModal = () => setIsSettingsOpen(true);
+    const handleRetryStatus = (e: any) => {
+      setRetryStatus(e.detail);
+      setTimeout(() => setRetryStatus(null), 14000);
+    };
+
     window.addEventListener('show-api-key-modal', handleShowModal);
-    return () => window.removeEventListener('show-api-key-modal', handleShowModal);
+    window.addEventListener('api-retry-status', handleRetryStatus);
+    
+    return () => {
+      window.removeEventListener('show-api-key-modal', handleShowModal);
+      window.removeEventListener('api-retry-status', handleRetryStatus);
+    };
   }, []);
 
   
@@ -44,6 +55,15 @@ export default function App() {
   
   return (
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
+      {retryStatus && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-5">
+          <AlertCircle className="w-5 h-5 text-amber-500 animate-pulse" />
+          <div className="text-sm">
+            <p className="font-semibold">Hệ thống AI đang bận (Lỗi quá tải - 429)</p>
+            <p>Đang tự động thử lại... ({retryStatus.attempt}/{retryStatus.maxRetries})</p>
+          </div>
+        </div>
+      )}
       {/* Mobile overlay */}
       {isSidebarOpen && (
         <div 

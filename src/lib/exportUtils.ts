@@ -55,22 +55,21 @@ export function exportHtmlToWord(element: HTMLElement, filename: string) {
         }
     });
 
-    // Extract MathML
- // from KaTeX for native Word Equation support
-    const katexElements = clone.querySelectorAll('.katex');
+// Extract MathML from KaTeX for native Word Equation support
+    const katexElements = clone.querySelectorAll(".katex");
     katexElements.forEach(el => {
-      const mathNode = el.querySelector('.katex-mathml math');
+      const mathNode = el.querySelector(".katex-mathml math");
       if (mathNode) {
-        const mathClone = mathNode.cloneNode(true) as Element;
+        const mathClone = mathNode.cloneNode(true);
         // IMPORTANT: Add MathML namespace for MS Word
-        mathClone.setAttribute('xmlns', 'http://www.w3.org/1998/Math/MathML');
+        mathClone.setAttribute("xmlns", "http://www.w3.org/1998/Math/MathML");
         
         // Remove annotation tags completely
-        const annotations = mathClone.querySelectorAll('annotation');
+        const annotations = mathClone.querySelectorAll("annotation");
         annotations.forEach(a => a.remove());
         
         // Remove semantics tag but keep its children to avoid Word confusion
-        const semantics = mathClone.querySelector('semantics');
+        const semantics = mathClone.querySelector("semantics");
         if (semantics) {
            while (semantics.firstChild) {
                mathClone.insertBefore(semantics.firstChild, semantics);
@@ -79,12 +78,38 @@ export function exportHtmlToWord(element: HTMLElement, filename: string) {
         }
         
         if (el.parentNode) {
-            el.parentNode.replaceChild(mathClone, el);
+            // Sanitization Layer: Detect mathematical expressions and wrap them safely
+            // This prevents MS Word layout engine from colliding adjacent text and handles encoding
+            const mathWrapper = document.createElement("span");
+            mathWrapper.className = "math-sanitization-wrapper";
+            // Use inline-block with explicit tiny margins to force MS Word to respect spacing boundaries
+            mathWrapper.setAttribute("style", "display: inline-block; margin: 0 0.1em; font-family: \"Cambria Math\", serif;");
+            
+            // Add protective non-breaking spaces
+            const spaceBefore = document.createTextNode("\u00A0");
+            const spaceAfter = document.createTextNode("\u00A0");
+            
+            mathWrapper.appendChild(spaceBefore);
+            mathWrapper.appendChild(mathClone);
+            mathWrapper.appendChild(spaceAfter);
+            
+            el.parentNode.replaceChild(mathWrapper, el);
         }
       }
     });
 
-    const contentHtml = clone.innerHTML;
+    let contentHtml = clone.innerHTML;
+    
+    // Global Document Sanitization Layer for DOCX Character Encoding & Spacing
+    // 1. Strip problematic zero-width characters that break Word text flow
+    contentHtml = contentHtml.replace(/[\u200B-\u200D\uFEFF]/g, "");
+    // 2. Prevent text collisions between consecutive formatted elements
+    contentHtml = contentHtml.replace(/<\/strong>\s*<strong>/g, "</strong> <strong>");
+    contentHtml = contentHtml.replace(/<\/em>\s*<em>/g, "</em> <em>");
+    // 3. Prevent text collision explicitly when letters immediately follow/precede the math wrapper
+    contentHtml = contentHtml.replace(/<\/span>([A-Za-z0-9])/g, "</span> $1");
+    contentHtml = contentHtml.replace(/([A-Za-z0-9])<span class=\"math-sanitization-wrapper\"/g, "$1 <span class=\"math-sanitization-wrapper\"");
+    
     const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.microsoft.com/office/2004/12/omml' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
 <meta charset='utf-8'>

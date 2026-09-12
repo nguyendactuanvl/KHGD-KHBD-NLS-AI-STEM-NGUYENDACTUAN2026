@@ -91,15 +91,37 @@ export function PdfToWord() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Có lỗi xảy ra khi xử lý file');
+        let errorData;
+        try {
+           errorData = await response.json();
+        } catch {
+           errorData = { error: await response.text() };
+        }
+        
+        let errorMsg = errorData.error || 'Có lỗi xảy ra khi xử lý file';
+        if (typeof errorMsg === 'object') errorMsg = JSON.stringify(errorMsg);
+        throw new Error(errorMsg);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error(`Lỗi phản hồi từ máy chủ (không phải JSON). Chi tiết: ${text ? text.substring(0, 150) : ""}`); }
       setResultText(typeof data.result === 'string' ? data.result : (data.result?.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data.result)));
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Lỗi kết nối. Vui lòng thử lại sau.');
+      const errorMsg = err.message || '';
+      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+        setError("Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao. Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân.");
+      } else if (errorMsg.includes('{"error":')) {
+        try {
+          const parsed = JSON.parse(errorMsg);
+          setError(parsed.error?.message || "Có lỗi xảy ra khi xử lý file");
+        } catch {
+          setError("Có lỗi xảy ra trong quá trình số hóa tài liệu. Vui lòng thử lại.");
+        }
+      } else {
+        setError(errorMsg || 'Lỗi kết nối. Vui lòng thử lại sau.');
+      }
     } finally {
       setIsUploading(false);
     }
