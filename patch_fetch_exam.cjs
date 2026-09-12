@@ -1,4 +1,8 @@
-import { Type, GoogleGenAI } from "@google/genai";
+const fs = require('fs');
+
+const generateExamPath = 'api/generate-exam.ts';
+let content = fs.readFileSync(generateExamPath, 'utf8');
+content = `import { Type, GoogleGenAI } from "@google/genai";
 
 function getAiClient(req: any) {
   let customKey = req.headers['x-gemini-api-key'] as string;
@@ -10,7 +14,7 @@ function getAiClient(req: any) {
   }
   let apiKey = customKey || process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("Missing Gemini API Key");
-  apiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
+  apiKey = apiKey.replace(/[^\\x20-\\x7E]/g, '').trim();
   return new GoogleGenAI({ apiKey });
 }
 
@@ -25,10 +29,10 @@ async function generateWithFallback(req: any, payloadOptions: any) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     for (const model of models) {
       try {
-        console.log(`Trying model ${model} (attempt ${attempt + 1})...`);
+        console.log(\`Trying model \${model} (attempt \${attempt + 1})...\`);
         return await client.models.generateContent({ ...payloadOptions, model });
       } catch (error: any) {
-        console.error(`Model ${model} failed:`, error?.message);
+        console.error(\`Model \${model} failed:\`, error?.message);
         const errorMsg = error?.message || "";
         const status = error?.status;
         
@@ -47,7 +51,7 @@ async function generateWithFallback(req: any, payloadOptions: any) {
       }
     }
     if (primaryError && attempt < maxRetries - 1) {
-      console.warn(`Attempt ${attempt + 1} failed with Quota/Overload. Retrying in ${3000 * (attempt + 1)}ms...`);
+      console.warn(\`Attempt \${attempt + 1} failed with Quota/Overload. Retrying in \${3000 * (attempt + 1)}ms...\`);
       await delay(3000 * (attempt + 1) + Math.random() * 1000);
     }
   }
@@ -77,22 +81,22 @@ export default async function handler(req: any, res: any) {
     const sa = qCounts.sa || 0;
     const essay = qCounts.essay || 0;
     
-    let mathPrompt = `Cấu trúc đề yêu cầu:
-- Trắc nghiệm nhiều lựa chọn (mc): ${mc} câu.
-- Trắc nghiệm Đúng/Sai (tf): ${tf} câu.
-- Trắc nghiệm trả lời ngắn (sa): ${sa} câu.
-- Tự luận (essay): ${essay} câu.`;
+    let mathPrompt = \`Cấu trúc đề yêu cầu:
+- Trắc nghiệm nhiều lựa chọn (mc): \${mc} câu.
+- Trắc nghiệm Đúng/Sai (tf): \${tf} câu.
+- Trắc nghiệm trả lời ngắn (sa): \${sa} câu.
+- Tự luận (essay): \${essay} câu.\`;
 
-    const promptText = `Bạn là chuyên gia ra đề thi môn ${subject} Lớp ${grade}.
-Thời gian làm bài: ${duration} phút.
-Ma trận / Nội dung: ${matrix}.
-${customPrompt ? "Yêu cầu thêm: " + customPrompt : ""}
-${mathPrompt}
+    const promptText = \`Bạn là chuyên gia ra đề thi môn \${subject} Lớp \${grade}.
+Thời gian làm bài: \${duration} phút.
+Ma trận / Nội dung: \${matrix}.
+\${customPrompt ? "Yêu cầu thêm: " + customPrompt : ""}
+\${mathPrompt}
 
 BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
 {
-  "title": "ĐỀ KIỂM TRA MÔN ${subject.toUpperCase()} LỚP ${grade}",
-  "duration": "${duration}",
+  "title": "ĐỀ KIỂM TRA MÔN \${subject.toUpperCase()} LỚP \${grade}",
+  "duration": "\${duration}",
   "questions": [
     {
       "id": 1,
@@ -105,7 +109,7 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
       "explanation": "Lời giải chi tiết..."
     }
   ]
-}`;
+}\`;
 
     const response = await generateWithFallback(req, {
       contents: promptText,
@@ -124,7 +128,7 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
     
     const rawQuestions = Array.isArray(parsedData.questions) ? parsedData.questions : (Array.isArray(parsedData) ? parsedData : []);
     const formattedQuestions = rawQuestions.map((q: any, idx: number) => {
-      const questionText = q.content || q.question || q.text || q.title || `Câu hỏi số ${idx + 1}`;
+      const questionText = q.content || q.question || q.text || q.title || \`Câu hỏi số \${idx + 1}\`;
       const choices = q.options || q.choices || q.answers || [];
       const rightAns = q.correct || q.answer || '';
       const correctAnsStr = q.correctAnswer || q.correct || q.answer || q.explanation || '';
@@ -159,7 +163,7 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
       success: true,
       data: { ...parsedData, questions: formattedQuestions },
       questions: formattedQuestions,
-      examName: parsedData.title || `Đề kiểm tra ${subject}`,
+      examName: parsedData.title || \`Đề kiểm tra \${subject}\`,
       exam: { ...parsedData, questions: formattedQuestions },
       result: { ...parsedData, questions: formattedQuestions }
     });
@@ -171,3 +175,7 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT MỘT ĐỐI TƯỢNG JSON VỚI CẤU TRÚC:
     return res.status(500).json({ error: errorMsg || "Failed to generate exam" });
   }
 }
+`;
+fs.writeFileSync(generateExamPath, content);
+console.log('Patched generate-exam.ts');
+

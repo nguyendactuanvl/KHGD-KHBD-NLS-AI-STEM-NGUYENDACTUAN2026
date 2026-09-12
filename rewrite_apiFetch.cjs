@@ -1,4 +1,6 @@
-export const API_KEY_STORAGE = 'eduplan_gemini_api_key_v2';
+const fs = require('fs');
+
+const content = `export const API_KEY_STORAGE = 'eduplan_gemini_api_key_v2';
 
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const getHeaders = (skipCustomKey = false) => {
@@ -45,6 +47,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
       // Remove broken keys so we don't keep trying them
       if (isAuthError || isInvalidKeyError) {
         localStorage.removeItem(API_KEY_STORAGE);
+        // Optionally show modal, but maybe wait to see if system key works first
       }
 
       // Retry without custom key (so the server uses its own system key)
@@ -53,19 +56,32 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
         headers: getHeaders(true)
       });
 
-      // If the system key ALSO fails, throw the ORIGINAL error
+      // If the system key ALSO fails, throw the system key error
       if (!response.ok) {
-        // Do not force show modal on Quota error to avoid spamming the user
-        if (isQuotaError) {
-           throw new Error("API Key cá nhân của bạn đã bị giới hạn tốc độ (Lỗi 429). Hệ thống đã tự động chuyển sang Key Hệ Thống nhưng cũng không khả dụng. Vui lòng đợi 1 phút rồi thử lại.");
+        const retryClonedRes = response.clone();
+        let retryErrorData;
+        try {
+          retryErrorData = await retryClonedRes.json();
+        } catch(e) {}
+        
+        const retryErrorMsg = typeof retryErrorData?.error === 'string' ? retryErrorData.error : JSON.stringify(retryErrorData?.error || "");
+        const retryIsAuthError = response.status === 401 || retryErrorMsg.includes("UNAUTHENTICATED") || retryErrorMsg.includes("deleted or disabled");
+        const retryIsQuotaError = response.status === 429 || retryErrorMsg.includes("vượt quá giới hạn") || retryErrorMsg.includes("quota") || retryErrorMsg.includes("429");
+
+        if (retryIsAuthError || retryIsQuotaError) {
+          window.dispatchEvent(new CustomEvent('show-api-key-modal'));
+          if (retryIsQuotaError) {
+             throw new Error("Hệ thống đang quá tải (429). Cả Key cá nhân và Key hệ thống đều đã vượt giới hạn tốc độ. Vui lòng đợi 1 phút rồi thử lại.");
+          }
+          throw new Error("Khóa API Hệ Thống và cá nhân đều không khả dụng. Vui lòng kiểm tra lại thiết lập API Key cá nhân.");
         }
-        if (isInvalidKeyError) {
-           throw new Error("API Key cá nhân của bạn không hợp lệ hoặc bị gõ sai. Hệ thống đã xóa key cũ, vui lòng nhập lại chính xác. (Key dự phòng của hệ thống hiện cũng đang bảo trì).");
-        }
-        throw new Error(errorMsg || "Khóa API Hệ Thống và cá nhân đều không khả dụng. Vui lòng kiểm tra lại thiết lập API Key cá nhân.");
+        
+        // Some other error from system key
+        throw new Error(retryErrorMsg || "Đã xảy ra lỗi từ hệ thống.");
       } else {
         // Fallback succeeded! If we removed a bad key, let user know.
         if (isAuthError || isInvalidKeyError) {
+           window.dispatchEvent(new CustomEvent('show-api-key-modal'));
            setTimeout(() => alert("API Key cá nhân của bạn không hợp lệ hoặc đã hết hạn nên hệ thống đã tạm xóa. Yêu cầu vừa rồi đã được xử lý thành công bằng Key Hệ Thống. Vui lòng nhập lại Key mới vào Cài đặt."), 1000);
         }
         return response;
@@ -73,9 +89,10 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     } else {
       // 3. We didn't have a custom key (meaning system key failed directly), or it's a non-fallback error
       if (isAuthError) {
+        window.dispatchEvent(new CustomEvent('show-api-key-modal'));
         throw new Error("Khóa API Hệ Thống không khả dụng. Vui lòng bấm vào Cài đặt ⚙️ ở menu bên trái để thiết lập mã API key cá nhân miễn phí.");
       } else if (isQuotaError) {
-        // Just throw error, do not force popup
+        window.dispatchEvent(new CustomEvent('show-api-key-modal'));
         throw new Error("Hệ thống đang quá tải (429). Vui lòng thiết lập API Key cá nhân trong Cài đặt ⚙️ để không bị giới hạn.");
       }
       
@@ -85,3 +102,6 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
 
   return response;
 }
+`;
+
+fs.writeFileSync('src/lib/apiFetch.ts', content);

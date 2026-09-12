@@ -16,26 +16,44 @@ function getAiClient(req: any) {
   return new GoogleGenAI({ apiKey });
 }
 
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 async function generateWithFallback(req: any, payloadOptions: any) {
   const client = getAiClient(req);
-  const models = ["gemini-3.6-flash", "gemini-3.1-pro-preview"];
-  let lastError: any;
-  for (const model of models) {
-    try {
-      console.log('Trying model ' + model + '...');
-      const payload = { ...payloadOptions, model };
-      return await client.models.generateContent(payload);
-    } catch (error: any) {
-      console.error('Model ' + model + ' failed:', error?.message);
-      lastError = error;
-      const errorMsg = error?.message || "";
-      if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || error?.status === 429 || errorMsg.includes("503") || errorMsg.includes("high demand") || errorMsg.includes("overloaded") || error?.status === 503 || error?.status === 500 || error?.status === 404 || errorMsg.includes("no longer available")) {
-        continue;
+  const models = ["gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-2.0-flash"];
+  let primaryError: any = null;
+  const maxRetries = 3;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    for (const model of models) {
+      try {
+        console.log(`Trying model ${model} (attempt ${attempt + 1})...`);
+        return await client.models.generateContent({ ...payloadOptions, model });
+      } catch (error: any) {
+        console.error(`Model ${model} failed:`, error?.message);
+        const errorMsg = error?.message || "";
+        const status = error?.status;
+        
+        if (
+          errorMsg.includes("429") || status === 429 || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") ||
+          errorMsg.includes("503") || status === 503 || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded") ||
+          error?.status === 500 || errorMsg.includes("no longer available")
+        ) {
+          if (!primaryError) primaryError = error;
+          continue; 
+        }
+        if (errorMsg.includes("not found") || status === 404) {
+          continue;
+        }
+        throw error;
       }
-      throw error;
+    }
+    if (primaryError && attempt < maxRetries - 1) {
+      console.warn(`Attempt ${attempt + 1} failed with Quota/Overload. Retrying in ${3000 * (attempt + 1)}ms...`);
+      await delay(3000 * (attempt + 1) + Math.random() * 1000);
     }
   }
-  throw lastError;
+  throw primaryError;
 }
 
 export const config = {

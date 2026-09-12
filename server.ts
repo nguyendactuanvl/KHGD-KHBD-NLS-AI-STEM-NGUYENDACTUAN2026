@@ -44,7 +44,7 @@ function handleAiError(error: any, req: any, res: any) {
     if (!isCustomKey) {
         return res.status(429).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (429). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
     }
-    return res.status(429).json({ error: "API Key cá nhân của bạn đã vượt quá giới hạn lượt dùng hoặc bị giới hạn tốc độ (429). Vui lòng đợi một lát rồi thử lại hoặc kiểm tra quota." });
+    return res.status(429).json({ error: "API Key cá nhân của bạn đã bị giới hạn tốc độ (Lỗi 429). Đối với Key miễn phí của Google AI Studio, giới hạn là 15 câu lệnh/phút. Vui lòng đợi đúng 1 phút rồi thử lại." });
   }
   if (errorMsg.includes("503") || error?.status === 503 || errorMsg.includes("UNAVAILABLE")) {
     if (!isCustomKey) {
@@ -64,26 +64,37 @@ async function generateWithFallback(req: any, payloadOptions: any) {
   const models = ["gemini-3.1-pro-preview", "gemini-2.5-flash", "gemini-2.0-flash"];
   let primaryError: any = null;
   
-  for (const model of models) {
-    try {
-      return await client.models.generateContent({ ...payloadOptions, model });
-    } catch (e: any) {
-      const errorMsg = e?.message || "";
-      const status = e?.status;
-      
-      if (
-        errorMsg.includes("429") || status === 429 || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") ||
-        errorMsg.includes("503") || status === 503 || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded")
-      ) {
-        if (!primaryError) primaryError = e; // Keep the most relevant error
-        continue; // Try next model
+  const maxRetries = 3;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    for (const model of models) {
+      try {
+        return await client.models.generateContent({ ...payloadOptions, model });
+      } catch (e: any) {
+        const errorMsg = e?.message || "";
+        const status = e?.status;
+        
+        if (
+          errorMsg.includes("429") || status === 429 || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") ||
+          errorMsg.includes("503") || status === 503 || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded")
+        ) {
+          if (!primaryError) primaryError = e;
+          continue; 
+        }
+        if (errorMsg.includes("not found") || status === 404) {
+          continue;
+        }
+        throw e; // Non-retryable
       }
-      if (errorMsg.includes("not found") || status === 404) {
-        continue; // Skip missing models
-      }
-      throw e; // Other errors (401, 400) throw immediately
+    }
+    
+    // If all models failed with 429/503, wait and retry
+    if (primaryError && attempt < maxRetries - 1) {
+      console.warn(`Attempt ${attempt + 1} failed with Quota/Overload. Retrying in ${2000 * (attempt + 1)}ms...`);
+      await delay(2000 * (attempt + 1) + Math.random() * 1000);
     }
   }
+  
   if (primaryError) throw primaryError;
   throw new Error("503 UNAVAILABLE: Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (503). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân.");
 }
@@ -452,45 +463,61 @@ app.all("/api/generate-lesson-plan", async (req, res) => {
     const subject = body.subject || 'Toán học';
 
     // Xây dựng System Prompt chi tiết theo đúng cấu trúc CV 5512 & GDPT 2018
-    const promptText = body.customPrompt || `Bạn là chuyên gia sư phạm môn ${subject} chương trình GDPT 2018. Hãy soạn một Kế hoạch bài dạy (Giáo án) chi tiết, chỉn chu, đúng chuẩn Công văn 5512/BGDĐT-GDTrH.
-TUYỆT ĐỐI BÁM SÁT VÀ SOẠN CHÍNH XÁC BÀI HỌC CÓ TÊN LÀ: "${topic}". KHÔNG ĐƯỢC ĐỔI SANG BÀI KHÁC HOẶC TỰ Ý THÊM BỚT NỘI DUNG NGOÀI CHỦ ĐỀ NÀY. CHÚ Ý KỸ YÊU CẦU CẦN ĐẠT CỦA BÀI NÀY LÀ GÌ ĐỂ TRÁNH LẠC ĐỀ.
-Đặc biệt lưu ý: Vui lòng sử dụng và bám sát nội dung, thuật ngữ, tiến trình của bộ sách giáo khoa: "${textbook}".
-Các thông tin cốt lõi của bài học:
-- Tên bài: ${topic}
-- Cấp học: ${grade}
+    const promptText = body.customPrompt || `Bạn là chuyên gia sư phạm hàng đầu tại Việt Nam, am hiểu sâu sắc Chương trình GDPT 2018 từ Lớp 1 đến Lớp 12 và hệ thống Kế hoạch giáo dục (KHGD / Phân phối chương trình).
+
+### QUY TẮC RÀNG BUỘC TUYỆT ĐỐI (STRICT CONSTRAINTS)
+1. ĐỒNG BỘ KHGD TUYỆT ĐỐI: 
+   - BẮT BUỘC chỉ soạn đúng Tên bài, Tiết theo PPCT, Môn học và Khối lớp được chọn sau:
+     + Môn học: ${subject}
+     + Khối lớp: ${grade}
+     + Tên bài học: ${topic}
+     + Thời lượng: ${periods} tiết
+   - Tuyệt đối KHÔNG tự ý lấy bài mặc định (như Bài 1 Lớp 10) hoặc nhảy sang bài của khối lớp khác. TUYỆT ĐỐI BÁM SÁT VÀ SOẠN CHÍNH XÁC BÀI HỌC CÓ TÊN LÀ: "${topic}".
+2. CHUẨN KHUNG KẾ HOẠCH BÀI DẠY THEO CẤP HỌC:
+   - Cấp Tiểu học (Lớp 1 - 5): Tuân thủ Công văn 2345/BGDĐT-GDTH.
+   - Cấp THCS & THPT (Lớp 6 - 12): Tuân thủ Công văn 5512/BGDĐT-GDTrH.
+3. KHÓA THÔNG TIN BÀI DẠY: Luôn in mục [THÔNG TIN TIẾT DẠY THEO KHGD] ở đầu phản hồi để xác nhận tính chính xác trước khi trình bày nội dung bài dạy.
+4. TÍCH HỢP HỢP LÝ CÁC NĂNG LỰC:
+   - Năng lực số (NLS): ${digitalCompetence}
+   - Năng lực AI (NL AI): ${aiCompetence}
+   - Tích hợp STEM/STEAM: ${stem}
+   - Yêu cầu cần đạt: ${requirements}
+   - Bộ sách: ${textbook}
+
+---
+
+### CẤU TRÚC ĐẦU RA KẾ HOẠCH BÀI DẠY (Dùng định dạng Markdown, bảng biểu rõ ràng)
+
+**Tuyệt đối KHÔNG sử dụng thẻ HTML <br> hoặc <br/>**: Hãy sử dụng dấu xuống dòng chuẩn của Markdown (Enter 2 lần) để ngắt đoạn.
+**Tô màu Năng lực số (NLS) và Năng lực AI**: Khi nhắc đến phần mềm, công cụ thiết bị số, Năng lực số hoặc công cụ AI trong bài, BẮT BUỘC phải bọc trong thẻ HTML <mark style="background-color: #dbeafe; color: #1d4ed8; font-weight: bold; padding: 2px 4px; border-radius: 4px;">Tên phần mềm / NLS</mark> để tô màu xanh nổi bật.
+
+[THÔNG TIN TIẾT DẠY THEO KHGD]
+- Môn học: ${subject} | Khối lớp: ${grade} | Bộ sách: ${textbook}
+- Tên bài dạy: ${topic}
 - Thời lượng: ${periods} tiết
-- Yêu cầu cần đạt: ${requirements}
-- Năng lực số tích hợp: ${digitalCompetence}
-- Năng lực AI tích hợp: ${aiCompetence}
-- Tích hợp STEM/STEAM: ${stem}
 
-BẮT BUỘC TRÌNH BÀY ĐẦY ĐỦ CÁC MỤC THEO KHUNG CV 5512:
-I. MỤC TIÊU:
-1. Về kiến thức
-2. Về năng lực:
-   - Năng lực chung (Tự chủ - tự học, Giao tiếp - hợp tác, Giải quyết vấn đề và sáng tạo).
-   - Năng lực đặc thù của môn học (đối với Toán là Tư duy và lập luận, Mô hình hóa, Giải quyết vấn đề, Giao tiếp, Sử dụng công cụ).
-   - Năng lực số: Tích hợp cụ thể nội dung "${digitalCompetence}".
-   - Năng lực AI: Tích hợp rõ hoạt động học sinh thực hành phân tích, kiểm chứng logic qua AI ("${aiCompetence}").
-3. Về phẩm chất (Yêu nước, Nhân ái, Chăm chỉ, Trung thực, Trách nhiệm).
+I. MỤC TIÊU
+1. Về năng lực:
+   - Năng lực chung: Tự chủ và tự học; Giao tiếp và hợp tác; Giải quyết vấn đề và sáng tạo.
+   - Năng lực đặc thù: Chuẩn năng lực bộ môn theo GDPT 2018 của bài này.
+   - Năng lực bổ sung & Tích hợp:
+     + Năng lực số (NLS): Thiết bị, phần mềm, học liệu số sử dụng trong bài.
+     + Năng lực AI (NL AI): Hoạt động gợi ý/phản biện bằng công cụ AI (nếu phù hợp).
+     + Tích hợp STEM/STEAM: Tình huống thực tế, nhiệm vụ chế tạo/mô phỏng liên môn.
+2. Về phẩm chất: Yêu nước, nhân ái, chăm chỉ, trung thực, trách nhiệm.
 
-II. THIẾT BỊ DẠY HỌC VÀ HỌC LIỆU:
-1. Giáo viên (Giáo án, bài giảng điện tử, phiếu học tập, ứng dụng AI/phần mềm).
-2. Học sinh (SGK, vở ghi, thiết bị kết nối mạng nếu có hoạt động AI/số).
+II. THIẾT BỊ DẠY HỌC VÀ HỌC LIỆU
+- Giáo viên: Giáo án, bài giảng điện tử, phiếu học tập, ứng dụng phần mềm/AI.
+- Học sinh: SGK, vở ghi, dụng cụ/thiết bị thực hành theo yêu cầu bài.
 
-III. TIẾN TRÌNH DẠY HỌC:
-Trình bày chi tiết từng hoạt động (1. Khởi động, 2. Hình thành kiến thức mới, 3. Luyện tập, 4. Vận dụng - có lồng ghép STEM và ứng dụng AI).
-Mỗi hoạt động phải gồm đủ 4 bước chuẩn CV 5512:
-a) Mục tiêu
-b) Nội dung
-c) Sản phẩm
-d) Tổ chức thực hiện:
-   - Chuyển giao nhiệm vụ
-   - Thực hiện nhiệm vụ
-   - Báo cáo, thảo luận
-   - Kết luận, nhận định
+III. TIẾN TRÌNH DẠY HỌC (4 HOẠT ĐỘNG CHUẨN)
+Trình bày chi tiết từng hoạt động (Khởi động, Hình thành kiến thức mới, Luyện tập, Vận dụng). Mỗi hoạt động phải trình bày bằng BẢNG (sử dụng chuẩn Markdown table) gồm:
+- Mục tiêu
+- Nội dung
+- Sản phẩm
+- Tổ chức thực hiện: 4 bước rõ ràng (Chuyển giao nhiệm vụ -> Thực hiện nhiệm vụ -> Báo cáo, thảo luận -> Kết luận, nhận định).
 
-Định dạng văn bản rõ ràng, phân cấp khoa học bằng Markdown, công thức Toán học dùng ký hiệu chuẩn TeX.`;
+Định dạng văn bản rõ ràng, phân cấp khoa học bằng Markdown, công thức Toán học dùng ký hiệu chuẩn TeX (sử dụng dấu $ cho công thức trong dòng và $ cho công thức độc lập). KHÔNG dùng các ký tự Unicode mô phỏng công thức.`;
 
     
     const response = await generateWithFallback(req, {
