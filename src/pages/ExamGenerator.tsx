@@ -1104,7 +1104,7 @@ ${customPrompt}
                         </div>
                         
                         {q.type === 'mc' && q.options && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-4">
+                          <div className="flex flex-col gap-3 pl-4">
                             {q.options.map((opt, oIdx) => (
                               <div key={oIdx} className={`flex items-start gap-1 p-2 rounded-md border ${oIdx === q.correctOptionIndex ? 'bg-emerald-50 border-emerald-200 font-medium' : 'border-transparent'}`}>
                                 <span className="shrink-0 font-medium">{String.fromCharCode(65 + oIdx)}.</span>

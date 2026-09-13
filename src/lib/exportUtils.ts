@@ -77,13 +77,66 @@ export function exportHtmlToWord(element: HTMLElement, filename: string) {
            semantics.remove();
         }
         
+        // Convert MathML exponents and subscripts to standard HTML for MS Word
+        // MS Word ignores MathML in .doc HTML format, but respects standard HTML tags
+        const msups = mathClone.querySelectorAll("msup");
+        msups.forEach(msup => {
+            if (msup.children.length >= 2) {
+                const base = msup.children[0];
+                const exp = msup.children[1];
+                const htmlSup = document.createElement("sup");
+                htmlSup.innerHTML = exp.innerHTML;
+                
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(base.cloneNode(true));
+                fragment.appendChild(htmlSup);
+                
+                if (msup.parentNode) msup.parentNode.replaceChild(fragment, msup);
+            }
+        });
+        
+        const msubs = mathClone.querySelectorAll("msub");
+        msubs.forEach(msub => {
+            if (msub.children.length >= 2) {
+                const base = msub.children[0];
+                const sub = msub.children[1];
+                const htmlSub = document.createElement("sub");
+                htmlSub.innerHTML = sub.innerHTML;
+                
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(base.cloneNode(true));
+                fragment.appendChild(htmlSub);
+                
+                if (msub.parentNode) msub.parentNode.replaceChild(fragment, msub);
+            }
+        });
+        
+        const msubsups = mathClone.querySelectorAll("msubsup");
+        msubsups.forEach(msubsup => {
+            if (msubsup.children.length >= 3) {
+                const base = msubsup.children[0];
+                const sub = msubsup.children[1];
+                const exp = msubsup.children[2];
+                const htmlSub = document.createElement("sub");
+                htmlSub.innerHTML = sub.innerHTML;
+                const htmlSup = document.createElement("sup");
+                htmlSup.innerHTML = exp.innerHTML;
+                
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(base.cloneNode(true));
+                fragment.appendChild(htmlSub);
+                fragment.appendChild(htmlSup);
+                
+                if (msubsup.parentNode) msubsup.parentNode.replaceChild(fragment, msubsup);
+            }
+        });
+
         if (el.parentNode) {
             // Sanitization Layer: Detect mathematical expressions and wrap them safely
             // This prevents MS Word layout engine from colliding adjacent text and handles encoding
             const mathWrapper = document.createElement("span");
             mathWrapper.className = "math-sanitization-wrapper";
-            // Use inline-block with explicit tiny margins to force MS Word to respect spacing boundaries
-            mathWrapper.setAttribute("style", "display: inline-block; margin: 0 0.1em; font-family: \"Cambria Math\", serif;");
+            mathWrapper.setAttribute("style", "font-family: \"Cambria Math\", serif;");
             
             // Add protective non-breaking spaces
             const spaceBefore = document.createTextNode("\u00A0");
