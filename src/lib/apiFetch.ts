@@ -60,7 +60,8 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     let customKeyUsed = !!localStorage.getItem(API_KEY_STORAGE);
     
     // First try with custom key (if exists), or system key
-    let response = await fetch(url, {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+    let response = await fetch(baseUrl + url, {
       credentials: 'include',
       ...options,
       headers: getHeaders(skipCustomKey)
@@ -131,6 +132,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
 }
 
 export async function uploadFileChunked(fileData: string, type: string): Promise<string> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
   const fileId = Math.random().toString(36).substring(2) + Date.now().toString(36);
   // Max payload is ~1MB for Nginx, so we use 500KB chunks
   const chunkSize = 500 * 1024;
@@ -138,7 +140,7 @@ export async function uploadFileChunked(fileData: string, type: string): Promise
   
   for (let i = 0; i < totalChunks; i++) {
     const chunkData = fileData.substring(i * chunkSize, (i + 1) * chunkSize);
-    const res = await fetch('/api/upload-chunk', {
+    const res = await fetch(baseUrl + '/api/upload-chunk', {
       credentials: 'include',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
