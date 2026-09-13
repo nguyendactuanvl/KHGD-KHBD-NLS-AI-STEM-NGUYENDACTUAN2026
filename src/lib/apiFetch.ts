@@ -89,10 +89,11 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
 
     const clonedRes = response.clone();
     let errorData;
+    let errText = await clonedRes.text();
     try {
-      errorData = await clonedRes.json();
+      errorData = JSON.parse(errText);
     } catch (e) {
-      errorData = { error: await clonedRes.text() };
+      errorData = { error: errText };
     }
 
     const is401 = response.status === 401;

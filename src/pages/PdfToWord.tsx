@@ -92,10 +92,11 @@ export function PdfToWord() {
 
       if (!response.ok) {
         let errorData;
+        let errText = await response.text();
         try {
-           errorData = await response.json();
+           errorData = JSON.parse(errText);
         } catch {
-           errorData = { error: await response.text() };
+           errorData = { error: errText };
         }
         
         let errorMsg = errorData.error || 'Có lỗi xảy ra khi xử lý file';
