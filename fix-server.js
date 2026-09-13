@@ -54,6 +54,7 @@ code = code.replace(/const app = express\(\);\n/, 'const app = express();\n' + c
 
 // Replace { files } = req.body
 code = code.replace(/const \{ files,?(.*?) \} = req.body;/g, (match, p1) => {
+  let replacements = [];
   if (p1.includes('lesson') || p1.includes('subject') || p1.includes('grade') || p1.includes('topic') || p1.includes('textbook')) {
     return `const { ${p1.trim().replace(/^,\s*/, '')} } = req.body;\n      const files = resolveFiles(req.body);`;
   }

@@ -4,6 +4,53 @@ import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 
 const app = express();
+
+const chunkStore = new Map<string, { chunks: string[], type: string, total: number, timestamp: number }>();
+
+app.post("/api/upload-chunk", (req, res) => {
+  const { fileId, chunkIndex, totalChunks, chunkData, type } = req.body;
+  if (!chunkStore.has(fileId)) {
+    chunkStore.set(fileId, { chunks: new Array(totalChunks), type, total: totalChunks, timestamp: Date.now() });
+  }
+  const fileEntry = chunkStore.get(fileId)!;
+  fileEntry.chunks[chunkIndex] = chunkData;
+  fileEntry.timestamp = Date.now();
+  res.json({ success: true });
+});
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, entry] of chunkStore.entries()) {
+    if (now - entry.timestamp > 10 * 60 * 1000) {
+      chunkStore.delete(id);
+    }
+  }
+}, 60 * 1000);
+
+function resolveFiles(reqBody: any) {
+  const files = reqBody.files || [];
+  const fileIds = reqBody.fileIds || [];
+  for (const id of fileIds) {
+    const entry = chunkStore.get(id);
+    if (entry) {
+      files.push({ data: entry.chunks.join(''), type: entry.type });
+      chunkStore.delete(id);
+    }
+  }
+  return files;
+}
+
+function resolveSingleFile(reqBody: any) {
+  let { file, type, fileId } = reqBody;
+  if (fileId && chunkStore.has(fileId)) {
+    const entry = chunkStore.get(fileId)!;
+    file = entry.chunks.join('');
+    type = entry.type;
+    chunkStore.delete(fileId);
+  }
+  return { file, type };
+}
+
 app.use(express.json({ limit: '50mb' }));
 
 const sharedExamsStore = new Map();
@@ -60,7 +107,7 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 async function generateWithFallback(req: any, payloadOptions: any) {
   const client = getAiClient(req);
-  const models = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.5-flash"];
+  const models = ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
   let primaryError: any = null;
   
   const maxRetries = 3;
@@ -119,7 +166,7 @@ app.all("/api/extract-data", async (req, res) => {
   }
   
     try {
-      const { file, type } = req.body;
+      const { file, type } = resolveSingleFile(req.body);
       let promptText = "";
       let responseSchema;
       
@@ -370,7 +417,8 @@ app.all("/api/generate-lesson-plan-file", async (req, res) => {
   }
   
     try {
-      const { lesson, subject, files, textbook } = req.body;
+      const { lesson, subject, textbook } = req.body;
+      const files = resolveFiles(req.body);
       const textbookName = textbook || "Kết nối tri thức với cuộc sống";
       
       const prompt = `Bạn là một giáo viên xuất sắc và chuyên gia giáo dục. Tôi đã tải lên một tài liệu Kế hoạch giáo dục (KHGD).
@@ -546,7 +594,8 @@ app.all("/api/generate-plan", async (req, res) => {
   }
   
     try {
-      const { subject, grade, topic, files } = req.body;
+      const { subject, grade, topic } = req.body;
+      const files = resolveFiles(req.body);
       
       const prompt = `Bạn là một Tổ trưởng chuyên môn và chuyên gia giáo dục. Hãy tạo/bổ sung một mẫu Kế hoạch giáo dục (KHGD) cho môn ${subject}, lớp ${grade}, chủ đề "${topic}".
       Giữ nguyên cấu trúc KHGD gốc (của công văn 5512/BGDĐT-GDTrH) và chỉ bổ sung các cột còn thiếu theo yêu cầu chuẩn của các công văn mới nhất về Năng lực số (NLS) (CV 3456) và Năng lực AI (QĐ 2422).
@@ -616,7 +665,7 @@ app.all("/api/generate-similar", async (req, res) => {
   }
   
     try {
-      const { files } = req.body;
+      const files = resolveFiles(req.body);
       if (!files || files.length === 0) {
         return res.status(400).json({ error: "No files provided" });
       }
@@ -708,7 +757,7 @@ app.all("/api/pdf-to-word", async (req, res) => {
   }
   
     try {
-      const { files } = req.body;
+      const files = resolveFiles(req.body);
       if (!files || files.length === 0) {
         return res.status(400).json({ error: "No files provided" });
       }
@@ -763,7 +812,7 @@ app.all("/api/solve-exercise", async (req, res) => {
   }
   
     try {
-      const { files } = req.body;
+      const files = resolveFiles(req.body);
       if (!files || files.length === 0) {
         return res.status(400).json({ error: "No files provided" });
       }

@@ -3,6 +3,41 @@ export const API_KEY_STORAGE = 'eduplan_gemini_api_key_v2';
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  if (options.body && typeof options.body === 'string' && options.body.length > 250 * 1024) {
+    try {
+      const parsedBody = JSON.parse(options.body);
+      let modified = false;
+      
+      if (parsedBody.files && Array.isArray(parsedBody.files)) {
+        parsedBody.fileIds = parsedBody.fileIds || [];
+        for (let i = 0; i < parsedBody.files.length; i++) {
+          const f = parsedBody.files[i];
+          if (f.data && f.data.length > 100 * 1024) {
+            const fileId = await uploadFileChunked(f.data, f.type);
+            parsedBody.fileIds.push(fileId);
+            f.data = ""; // Clear large data
+            modified = true;
+          }
+        }
+        // Filter out empty data files if they were offloaded
+        parsedBody.files = parsedBody.files.filter((f: any) => f.data.length > 0);
+      }
+      
+      if (parsedBody.file && typeof parsedBody.file === 'string' && parsedBody.file.length > 100 * 1024) {
+        const fileId = await uploadFileChunked(parsedBody.file, parsedBody.type || 'text/plain');
+        parsedBody.fileId = fileId;
+        parsedBody.file = ""; // Clear
+        modified = true;
+      }
+      
+      if (modified) {
+        options.body = JSON.stringify(parsedBody);
+      }
+    } catch (e) {
+      console.warn("Could not chunk upload:", e);
+    }
+  }
+
   const getHeaders = (skipCustomKey = false) => {
     const headers = new Headers(options.headers || {});
     headers.delete('x-gemini-api-key');
@@ -31,7 +66,13 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("text/html")) {
-      throw new Error("Dữ liệu quá lớn, đã bị hệ thống proxy/mạng từ chối (hoặc máy chủ bảo trì). Vui lòng giảm dung lượng file xuống dưới 5MB để đảm bảo kết nối ổn định.");
+      if (response.status === 504 || response.status === 502) {
+        throw new Error("Hệ thống xử lý quá lâu và bị ngắt kết nối (Lỗi Timeout). Việc tạo tài liệu chi tiết (như Kế hoạch bài dạy, Đề thi) tốn rất nhiều thời gian. Vui lòng thử chia nhỏ yêu cầu, hoặc thiết lập API Key cá nhân để bỏ qua giới hạn của máy chủ proxy.");
+      } else if (response.status === 413) {
+        throw new Error("Dữ liệu quá lớn, đã bị hệ thống proxy/mạng từ chối. Vui lòng giảm dung lượng file hoặc nội dung yêu cầu.");
+      } else {
+        throw new Error("Máy chủ trả về trang lỗi HTML thay vì JSON (Lỗi " + response.status + "). Có thể do hệ thống đang bảo trì hoặc quá tải.");
+      }
     }
     if (response.ok) return response;
 
@@ -77,4 +118,24 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
   }
   
   throw new Error("Request failed after retries.");
+}
+
+export async function uploadFileChunked(fileData: string, type: string): Promise<string> {
+  const fileId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+  // Max payload is ~1MB for Nginx, so we use 500KB chunks
+  const chunkSize = 500 * 1024;
+  const totalChunks = Math.ceil(fileData.length / chunkSize);
+  
+  for (let i = 0; i < totalChunks; i++) {
+    const chunkData = fileData.substring(i * chunkSize, (i + 1) * chunkSize);
+    const res = await fetch('/api/upload-chunk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileId, chunkIndex: i, totalChunks, chunkData, type })
+    });
+    if (!res.ok) {
+      throw new Error(`Lỗi khi tải file lên (phần ${i + 1}/${totalChunks}). Vui lòng thử lại.`);
+    }
+  }
+  return fileId;
 }
