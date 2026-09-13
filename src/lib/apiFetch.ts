@@ -110,7 +110,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
       throw new Error("API Key cá nhân của bạn không hợp lệ, đã bị vô hiệu hóa, hoặc đã bị xóa (Lỗi 400/401). Vui lòng kiểm tra lại. Hệ thống đã tự động gỡ API Key lỗi này.");
     }
     
-    if (isQuotaError || response.status === 503 || lowerMsg.includes("overloaded")) {
+    if (isQuotaError || response.status === 503 || errorMsg.toLowerCase().includes("overloaded")) {
       if (attempt < maxRetries) {
         console.warn(`[apiFetch] Rate limited (429/503). Retrying in 15 seconds... (Attempt ${attempt + 1} of ${maxRetries})`);
         window.dispatchEvent(new CustomEvent('api-retry-status', { detail: { attempt: attempt + 1, maxRetries } }));
