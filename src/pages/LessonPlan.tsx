@@ -125,7 +125,7 @@ export function LessonPlan() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-gemini-api-key': encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "")
+          
         },
         body: JSON.stringify(payload)
       });

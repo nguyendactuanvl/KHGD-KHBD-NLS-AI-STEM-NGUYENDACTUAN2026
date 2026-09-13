@@ -163,7 +163,7 @@ export function Gamification() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "")
+            
           },
           body: JSON.stringify({ file: base64, type: "students" })
         });
@@ -197,7 +197,7 @@ export function Gamification() {
         }
       } catch (err) {
         console.error(err);
-        showDialog('alert', "Có lỗi xảy ra khi trích xuất. Vui lòng kiểm tra API Key.");
+        showDialog('alert', "Lỗi: " + (err.message || "Có lỗi xảy ra khi trích xuất. Vui lòng kiểm tra API Key."));
       } finally {
         setIsExtractingSt(false);
         e.target.value = '';
@@ -298,7 +298,7 @@ export function Gamification() {
 
       const res = await apiFetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "") },
+        headers: { "Content-Type": "application/json",  },
         body: JSON.stringify({ prompt: aiQuery, context: rankedData })
       });
       const text = await res.text();

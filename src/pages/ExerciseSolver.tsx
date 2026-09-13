@@ -160,7 +160,7 @@ export function ExerciseSolver() {
 
       const response = await apiFetch('/api/generate-similar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': encodeURIComponent(localStorage.getItem('eduplan_gemini_api_key_v2') || '') },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           files: [{ data: fileData, type: mimeType }]
         })
@@ -204,7 +204,7 @@ const handleSolve = async () => {
 
       const response = await apiFetch('/api/solve-exercise', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': encodeURIComponent(localStorage.getItem('eduplan_gemini_api_key_v2') || '') },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           files: [{ data: fileData, type: mimeType }]
         })

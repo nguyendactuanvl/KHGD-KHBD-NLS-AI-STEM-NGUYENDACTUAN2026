@@ -4,6 +4,7 @@ import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 
 const app = express();
+app.use(express.json({ limit: '50mb' }));
 
 const chunkStore = new Map<string, { chunks: string[], type: string, total: number, timestamp: number }>();
 
@@ -51,55 +52,63 @@ function resolveSingleFile(reqBody: any) {
   return { file, type };
 }
 
-app.use(express.json({ limit: '50mb' }));
 
 const sharedExamsStore = new Map();
 
 function getAiClient(req: any) {
-  let customKey = req.headers['x-gemini-api-key'] as string;
+  const authHeader = req.headers['authorization'] as string;
+  let customKey = '';
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    customKey = authHeader.substring(7);
+  } else {
+    customKey = req.headers['x-gemini-api-key'] as string;
+  }
+  
   if (customKey) {
     try { customKey = decodeURIComponent(customKey); } catch (e) {}
+    customKey = customKey.replace(/[^\x20-\x7E]/g, '').trim();
+    return new GoogleGenAI({ apiKey: customKey });
   }
-  let apiKey = customKey || process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Missing Gemini API Key");
-  return new GoogleGenAI({ apiKey: apiKey.replace(/[^\x20-\x7E]/g, '').trim() });
+  
+  return new GoogleGenAI({ apiKey: process.env.CUSTOM_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "missing" });
 }
 
 function handleAiError(error: any, req: any, res: any) {
   const errorMsg = error?.message || "";
-  const isCustomKey = !!req.headers['x-gemini-api-key'];
+  const lowerMsg = errorMsg.toLowerCase();
+  const isCustomKey = !!req.headers['x-gemini-api-key'] || (!!req.headers['authorization'] && (req.headers['authorization'] as string).startsWith('Bearer '));
 
-  if (errorMsg.includes("API_KEY_INVALID") || errorMsg.includes("API key not valid")) {
+  if (lowerMsg.includes("api_key_invalid") || lowerMsg.includes("api key not valid")) {
     return res.status(400).json({ error: "API Key không hợp lệ. Vui lòng kiểm tra lại Cài đặt hệ thống và đảm bảo API Key chính xác." });
   }
-  if (errorMsg.includes("UNAUTHENTICATED") || errorMsg.includes("service account is deleted") || error?.status === 401 || errorMsg.includes("ACCOUNT_STATE_INVALID")) {
+  if (lowerMsg.includes("unauthenticated") || lowerMsg.includes("service account is deleted") || error?.status === 401 || lowerMsg.includes("account_state_invalid")) {
     if (!isCustomKey) {
-        return res.status(401).json({ error: "UNAUTHENTICATED: Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch. Vui lòng thiết lập API Key cá nhân trong phần Cài đặt." });
+        return res.status(401).json({ error: "Tài khoản API mặc định của hệ thống đang tạm ngưng. Để tiếp tục sử dụng ứng dụng, thầy/cô vui lòng bấm vào mục \"Nhập mã API key\" ở thanh menu bên trái và điền API Key cá nhân của mình (từ Google AI Studio). Xin lỗi thầy/cô vì sự bất tiện này!" });
     }
     return res.status(401).json({ error: "UNAUTHENTICATED: Tài khoản dịch vụ liên kết với API Key cá nhân của bạn đã bị vô hiệu hóa hoặc không hợp lệ." });
   }
 
-  if (errorMsg.includes("suspended") || errorMsg.includes("PERMISSION_DENIED") || error?.status === 403) {
+  if (lowerMsg.includes("suspended") || lowerMsg.includes("permission_denied") || error?.status === 403) {
     if (!isCustomKey) {
         return res.status(401).json({ error: "UNAUTHENTICATED: Hệ thống AI hiện đang bảo trì hoặc hết hạn ngạch." });
     }
     return res.status(401).json({ error: "UNAUTHENTICATED: Tài khoản API Key cá nhân của bạn đã bị từ chối quyền truy cập." });
   }
 
-  if (errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") || errorMsg.includes("429") || error?.status === 429) {
+  if (lowerMsg.includes("resource_exhausted") || lowerMsg.includes("quota") || lowerMsg.includes("429") || error?.status === 429) {
     if (!isCustomKey) {
         return res.status(429).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (429). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
     }
     return res.status(429).json({ error: "API Key cá nhân của bạn hiện đang nhận quá nhiều yêu cầu cùng lúc (Lỗi 429). Chi tiết từ Google: " + errorMsg });
   }
-  if (errorMsg.includes("503") || error?.status === 503 || errorMsg.includes("UNAVAILABLE")) {
+  if (lowerMsg.includes("503") || error?.status === 503 || lowerMsg.includes("unavailable")) {
     if (!isCustomKey) {
         return res.status(503).json({ error: "Hệ thống đang quá tải hoặc tạm thời không khả dụng do nhu cầu cao (503). Vui lòng thử lại sau ít phút hoặc sử dụng API Key cá nhân." });
     }
     return res.status(503).json({ error: "Hệ thống AI của Google đang quá tải (503). Vui lòng đợi vài giây và thử lại." });
   }
 
-  console.error("Unhandled AI Error:", error);
+  console.error("AI Error Debug:", error, error?.status, error?.message);
   res.status(500).json({ error: errorMsg || "Đã xảy ra lỗi không xác định từ máy chủ AI. Vui lòng thử lại sau." });
 }
 
@@ -107,7 +116,7 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 async function generateWithFallback(req: any, payloadOptions: any) {
   const client = getAiClient(req);
-  const models = ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
+  const models = ["gemini-3.6-flash"];
   let primaryError: any = null;
   
   const maxRetries = 3;
@@ -120,9 +129,10 @@ async function generateWithFallback(req: any, payloadOptions: any) {
         const errorMsg = e?.message || "";
         const status = e?.status;
         
+        const lowerMsg = (e?.message || "").toLowerCase();
         if (
-          errorMsg.includes("429") || status === 429 || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("quota") ||
-          errorMsg.includes("503") || status === 503 || errorMsg.includes("UNAVAILABLE") || errorMsg.includes("overloaded")
+          lowerMsg.includes("429") || status === 429 || lowerMsg.includes("resource_exhausted") || lowerMsg.includes("quota") ||
+          lowerMsg.includes("503") || status === 503 || lowerMsg.includes("unavailable") || lowerMsg.includes("overloaded")
         ) {
           if (!primaryError) primaryError = e;
           continue; 
@@ -919,8 +929,19 @@ if (!process.env.VERCEL) {
     });
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      }
+    }));
+    app.get("*", (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.sendFile(path.join(distPath, "index.html"));
+    });
     app.listen(PORT, "0.0.0.0", () => console.log("Server running on port " + PORT));
   }
 }

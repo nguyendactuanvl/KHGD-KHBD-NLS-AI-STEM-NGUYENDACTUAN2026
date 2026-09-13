@@ -84,7 +84,7 @@ export function PdfToWord() {
 
       const response = await apiFetch('/api/pdf-to-word', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': encodeURIComponent(localStorage.getItem('eduplan_gemini_api_key_v2') || '') },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           files: [{ data: fileData, type: mimeType }]
         })

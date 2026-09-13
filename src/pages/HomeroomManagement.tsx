@@ -181,7 +181,7 @@ export function HomeroomManagement() {
              method: "POST",
              headers: {
                "Content-Type": "application/json",
-               "x-gemini-api-key": encodeURIComponent(localStorage.getItem("eduplan_gemini_api_key_v2") || "")
+               
              },
              body: JSON.stringify({ file: base64, type: "student_profiles" })
            });
@@ -218,7 +218,7 @@ export function HomeroomManagement() {
            }
          } catch (err) {
            console.error(err);
-           alert("Có lỗi xảy ra khi trích xuất. Vui lòng kiểm tra API Key.");
+           alert("Lỗi: " + (err.message || "Có lỗi xảy ra khi trích xuất. Vui lòng kiểm tra API Key."));
          } finally {
            setIsExtracting(false);
            e.target.value = '';

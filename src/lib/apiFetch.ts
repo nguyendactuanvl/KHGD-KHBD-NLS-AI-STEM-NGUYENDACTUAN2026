@@ -41,11 +41,13 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
   const getHeaders = (skipCustomKey = false) => {
     const headers = new Headers(options.headers || {});
     headers.delete('x-gemini-api-key');
+    headers.delete('Authorization');
     
     if (!skipCustomKey) {
       const customKey = localStorage.getItem(API_KEY_STORAGE);
       if (customKey) {
-        headers.set('x-gemini-api-key', encodeURIComponent(customKey));
+        headers.set('Authorization', 'Bearer ' + encodeURIComponent(customKey));
+        headers.set('x-gemini-api-key', encodeURIComponent(customKey)); // Keep fallback
       }
     }
     return headers;
@@ -59,6 +61,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     
     // First try with custom key (if exists), or system key
     let response = await fetch(url, {
+      credentials: 'include',
       ...options,
       headers: getHeaders(skipCustomKey)
     });
@@ -66,12 +69,19 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("text/html")) {
+      const text = await response.text();
+      const lowerText = text.toLowerCase();
+      console.warn("HTML ERROR RESPONSE:", text.substring(0, 500));
       if (response.status === 504 || response.status === 502) {
         throw new Error("Hệ thống xử lý quá lâu và bị ngắt kết nối (Lỗi Timeout). Việc tạo tài liệu chi tiết (như Kế hoạch bài dạy, Đề thi) tốn rất nhiều thời gian. Vui lòng thử chia nhỏ yêu cầu, hoặc thiết lập API Key cá nhân để bỏ qua giới hạn của máy chủ proxy.");
       } else if (response.status === 413) {
         throw new Error("Dữ liệu quá lớn, đã bị hệ thống proxy/mạng từ chối. Vui lòng giảm dung lượng file hoặc nội dung yêu cầu.");
+      } else if (lowerText.includes("aistudio_auth_flow") || lowerText.includes("action required") || lowerText.includes("aistudio-iframe") || lowerText.includes("cookie_check") || lowerText.includes("cookie check") || lowerText.includes("id=\"app\"") || lowerText.includes("id=\"root\"")) {
+        throw new Error("Xác thực bảo mật của trình duyệt hết hạn hoặc API bị chặn (404). Vui lòng TẢI LẠI TRANG (nhấn F5) hoặc MỞ ỨNG DỤNG TRONG TAB MỚI. Nếu vẫn lỗi, hãy sử dụng tính năng 'Nhập mã API key' cá nhân.");
+      } else if (lowerText.includes("nginx")) {
+         throw new Error("Hệ thống máy chủ mạng (Nginx) đã chặn kết nối hoặc quá tải (Lỗi " + response.status + "). Vui lòng tải lại trang hoặc thiết lập API Key cá nhân để kết nối trực tiếp.");
       } else {
-        throw new Error("Máy chủ trả về trang lỗi HTML thay vì JSON (Lỗi " + response.status + "). Có thể do hệ thống đang bảo trì hoặc quá tải.");
+        throw new Error("Máy chủ trả về trang lỗi HTML thay vì JSON (Lỗi " + response.status + "). Hệ thống đang bảo trì, quá tải, hoặc xác thực bị lỗi.");
       }
     }
     if (response.ok) return response;
@@ -98,7 +108,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
       throw new Error("API Key cá nhân của bạn không hợp lệ, đã bị vô hiệu hóa, hoặc đã bị xóa (Lỗi 400/401). Vui lòng kiểm tra lại. Hệ thống đã tự động gỡ API Key lỗi này.");
     }
     
-    if (isQuotaError || response.status === 503 || errorMsg.includes("overloaded")) {
+    if (isQuotaError || response.status === 503 || lowerMsg.includes("overloaded")) {
       if (attempt < maxRetries) {
         console.warn(`[apiFetch] Rate limited (429/503). Retrying in 15 seconds... (Attempt ${attempt + 1} of ${maxRetries})`);
         window.dispatchEvent(new CustomEvent('api-retry-status', { detail: { attempt: attempt + 1, maxRetries } }));
@@ -129,6 +139,7 @@ export async function uploadFileChunked(fileData: string, type: string): Promise
   for (let i = 0; i < totalChunks; i++) {
     const chunkData = fileData.substring(i * chunkSize, (i + 1) * chunkSize);
     const res = await fetch('/api/upload-chunk', {
+      credentials: 'include',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileId, chunkIndex: i, totalChunks, chunkData, type })
